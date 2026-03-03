@@ -68,6 +68,7 @@
 				<version>1.15.0</version>
 				<configuration>
 					<nodeVersion>v18.20.2</nodeVersion>
+					<npmVersion>9.6.7</npmVersion>
 				</configuration>
 				<executions>
 					<execution>
