@@ -67,7 +67,7 @@
 				<artifactId>frontend-maven-plugin</artifactId>
 				<version>1.15.0</version>
 				<configuration>
-					<nodeVersion>v22.12.0</nodeVersion>
+					<nodeVersion>v18.20.2</nodeVersion>
 				</configuration>
 				<executions>
 					<execution>
