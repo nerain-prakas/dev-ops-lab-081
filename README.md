@@ -1,62 +1,68 @@
 # Online Course Reservation System
 
-This is a full-stack web application for an online course reservation system. The frontend is built with React and Vite, and the backend is a Flask REST API.
+This is a full-stack web application for an online course reservation system, built with the MERN stack (MongoDB, Express, React, Node.js) and using Vite for the frontend.
 
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
 
 *   [Node.js](https://nodejs.org/) (which includes npm)
-*   [Python](https://www.python.org/)
-*   [PostgreSQL](https://www.postgresql.org/)
+*   [MongoDB](https://www.mongodb.com/try/download/community)
 
-## Backend Setup
+## Setup and Installation
 
-1.  **Navigate to the backend directory:**
-    ```bash
-    cd backend
-    ```
+1.  **Clone the repository.**
 
-2.  **Create and activate a virtual environment:**
-    ```bash
-    python -m venv venv
-    # On Windows
-    venv\\Scripts\\activate
-    # On macOS/Linux
-    source venv/bin/activate
-    ```
-
-3.  **Install the required Python packages:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4.  **Set up the database:**
-    *   Make sure you have a PostgreSQL server running.
-    *   Create a database named `course_reservation_db`.
-    *   The default connection string is `postgresql://postgres:password@localhost:5432/course_reservation_db`. You can change this in the `config.py` file or by setting the `DATABASE_URL` environment variable.
-
-5.  **Run the backend server:**
-    ```bash
-    python app.py
-    ```
-    The backend server will be running on `http://localhost:5000`.
-
-## Frontend Setup
-
-1.  **Navigate to the project root directory.**
-
-2.  **Install the required npm packages:**
+2.  **Install frontend dependencies:**
+    From the project root directory, run:
     ```bash
     npm install
     ```
 
-3.  **Run the frontend development server:**
+3.  **Install backend dependencies:**
+    Navigate to the `server` directory and run:
     ```bash
-    npm run dev
+    cd server
+    npm install
     ```
-    The frontend will be accessible at `http://localhost:3000`.
+
+4.  **Set up environment variables:**
+    In the `server` directory, create a `.env` file and add the following, replacing the placeholder values with your own:
+    ```
+    MONGO_URI=mongodb://localhost:27017/course_reservation_db
+    JWT_SECRET=your_jwt_secret_key
+    ```
 
 ## Running the Application
 
-After completing the setup for both the backend and frontend, you can open your browser and navigate to `http://localhost:3000` to use the application.
+You will need to run the frontend and backend servers concurrently in separate terminals.
+
+1.  **Run the backend server:**
+    From the `server` directory, run:
+    ```bash
+    npm start
+    ```
+    The backend server will start on `http://localhost:5000`.
+
+2.  **Run the frontend development server:**
+    From the project root directory, run:
+    ```bash
+    npm run dev
+    ```
+    The frontend will be accessible at `http://localhost:3000`. API requests will be automatically proxied to the backend server.
+
+## Production Build
+
+1.  **Build the frontend:**
+    From the project root directory, run:
+    ```bash
+    npm run build
+    ```
+    This will build the React app and place the static files in the `dist` directory.
+
+2.  **Run the application in production:**
+    The Express server is configured to serve the static frontend files in a production environment. Simply start the server from the `server` directory:
+    ```bash
+    npm start
+    ```
+    The entire application will be available at `http://localhost:5000`.

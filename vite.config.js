@@ -6,14 +6,16 @@ export default defineConfig({
   plugins: [react()],
   root: '.',
   build: {
-    outDir: 'src/main/resources/static',
+    // Output to a directory that Flask can serve
+    outDir: 'backend/static',
     emptyOutDir: true,
   },
   server: {
     port: 3000,
+    // Proxy API requests to the Flask backend
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:5000',
         changeOrigin: true,
       },
     },
