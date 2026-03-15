@@ -1,5 +1,4 @@
 from database.db import db
-from werkzeug.security import generate_password_hash, check_password_hash
 
 
 class User(db.Model):
@@ -20,12 +19,12 @@ class User(db.Model):
     instructor = db.relationship("Instructor", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
     def set_password(self, plain_password: str) -> None:
-        """Hash and store the password."""
-        self.password = generate_password_hash(plain_password)
+        """Store password as plain text."""
+        self.password = plain_password
 
     def check_password(self, plain_password: str) -> bool:
-        """Verify a plaintext password against the stored hash."""
-        return check_password_hash(self.password, plain_password)
+        """Compare plain text passwords directly."""
+        return self.password == plain_password
 
     def to_dict(self) -> dict:
         return {

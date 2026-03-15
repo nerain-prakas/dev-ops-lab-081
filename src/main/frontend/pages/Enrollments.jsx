@@ -1,152 +1,111 @@
-import React, { useState } from 'react';
-import { mockEnrollments, mockCourses, mockUsers } from '../data/mockData';
+import React, { useState, useEffect } from 'react';
+import { enrollmentsAPI, adminAPI } from '../services/api';
 
 export default function Enrollments() {
-    const [enrollments, setEnrollments] = useState(mockEnrollments);
-    const [search, setSearch] = useState('');
-    const [showModal, setShowModal] = useState(false);
-    const [form, setForm] = useState({ studentName: '', courseName: '' });
-    const userRole = localStorage.getItem('userRole') || 'ADMIN';
+  const [enrollments, setEnrollments] = useState([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const userRole = localStorage.getItem('userRole') || 'ADMIN';
 
-    const students = mockUsers.filter((u) => u.role === 'STUDENT');
+  useEffect(() => { fetchEnrollments(); }, []);
 
-    const filtered = enrollments.filter(
-        (e) =>
-            e.studentName.toLowerCase().includes(search.toLowerCase()) ||
-            e.courseName.toLowerCase().includes(search.toLowerCase()) ||
-            e.status.toLowerCase().includes(search.toLowerCase())
-    );
+  const fetchEnrollments = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      let data;
+      if (userRole === 'ADMIN') {
+        data = await adminAPI.getEnrollments();
+      } else {
+        data = await enrollmentsAPI.getAll();
+      }
+      setEnrollments(data.enrollments);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleEnroll = (e) => {
-        e.preventDefault();
-        const newEnrollment = {
-            enrollmentId: Date.now(),
-            studentName: form.studentName,
-            courseName: form.courseName,
-            status: 'ACTIVE',
-            enrollmentDate: new Date().toISOString().split('T')[0],
-        };
-        setEnrollments([newEnrollment, ...enrollments]);
-        setShowModal(false);
-        setForm({ studentName: '', courseName: '' });
-    };
+  const filtered = enrollments.filter(
+    (e) =>
+      (e.student_name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (e.course_title || '').toLowerCase().includes(search.toLowerCase()) ||
+      e.status.toLowerCase().includes(search.toLowerCase())
+  );
 
-    const handleDrop = (id) => {
-        setEnrollments(enrollments.map((e) => (e.enrollmentId === id ? { ...e, status: 'DROPPED' } : e)));
-    };
+  if (loading) return <div className="slide-up" style={{ color: 'var(--text-secondary)', padding: '40px' }}>Loading enrollments...</div>;
 
-    return (
-        <div className="slide-up">
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title">Enrollments</h1>
-                    <p className="page-subtitle">{userRole === 'STUDENT' ? 'Your active and past course enrollments' : 'Manage student course enrollments'}</p>
-                </div>
-                {userRole !== 'STUDENT' && (
-                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Enrollment</button>
-                )}
-            </div>
-
-            <div className="table-wrapper">
-                <div className="table-header">
-                    <h3 className="table-title">All Enrollments ({filtered.length})</h3>
-                    <div className="table-search">
-                        <span>🔍</span>
-                        <input placeholder="Search enrollments..." value={search} onChange={(e) => setSearch(e.target.value)} />
-                    </div>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Student</th>
-                            <th>Course</th>
-                            <th>Status</th>
-                            <th>Date</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filtered.map((enrollment) => (
-                            <tr key={enrollment.enrollmentId}>
-                                <td>#{enrollment.enrollmentId}</td>
-                                <td style={{ fontWeight: 600 }}>{enrollment.studentName}</td>
-                                <td>{enrollment.courseName}</td>
-                                <td>
-                                    <span className={`badge ${enrollment.status === 'ACTIVE' ? 'success' : enrollment.status === 'COMPLETED' ? 'info' : 'danger'}`}>
-                                        {enrollment.status}
-                                    </span>
-                                </td>
-                                <td style={{ color: 'var(--text-secondary)' }}>{enrollment.enrollmentDate}</td>
-                                <td>
-                                    <div className="action-buttons">
-                                        {enrollment.status === 'ACTIVE' && (
-                                            userRole === 'STUDENT' ? (
-                                                <button className="btn btn-sm btn-primary" onClick={() => alert(`Launching course content for: ${enrollment.courseName}`)}>
-                                                    📘 Learn Course
-                                                </button>
-                                            ) : (
-                                                <button className="btn btn-sm btn-danger" onClick={() => handleDrop(enrollment.enrollmentId)}>
-                                                    Drop
-                                                </button>
-                                            )
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                        {filtered.length === 0 && (
-                            <tr>
-                                <td colSpan="6">
-                                    <div className="empty-state">
-                                        <div className="empty-state-icon">📝</div>
-                                        <div className="empty-state-title">No enrollments found</div>
-                                        <div className="empty-state-desc">Try adjusting your search or enroll a student.</div>
-                                    </div>
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Modal */}
-            {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3 className="modal-title">New Enrollment</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
-                        </div>
-                        <form onSubmit={handleEnroll}>
-                            <div className="modal-body">
-                                <div className="form-group">
-                                    <label className="form-label">Student</label>
-                                    <select className="form-select" value={form.studentName} onChange={(e) => setForm({ ...form, studentName: e.target.value })} required>
-                                        <option value="">Select a student</option>
-                                        {students.map((s) => (
-                                            <option key={s.userId} value={s.name}>{s.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Course</label>
-                                    <select className="form-select" value={form.courseName} onChange={(e) => setForm({ ...form, courseName: e.target.value })} required>
-                                        <option value="">Select a course</option>
-                                        {mockCourses.map((c) => (
-                                            <option key={c.courseId} value={c.title}>{c.title}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">Enroll Student</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+  return (
+    <div className="slide-up">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Enrollments</h1>
+          <p className="page-subtitle">
+            {userRole === 'STUDENT' ? 'Your active and past course enrollments' : 'All student course enrollments'}
+          </p>
         </div>
-    );
+      </div>
+
+      {error && <div style={{ color: '#f87171', marginBottom: '16px' }}>⚠️ {error}</div>}
+
+      <div className="table-wrapper">
+        <div className="table-header">
+          <h3 className="table-title">All Enrollments ({filtered.length})</h3>
+          <div className="table-search">
+            <span>🔍</span>
+            <input placeholder="Search enrollments..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              {userRole !== 'STUDENT' && <th>Student</th>}
+              <th>Course</th>
+              <th>Status</th>
+              <th>Date</th>
+              {userRole === 'STUDENT' && <th>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((enrollment) => (
+              <tr key={enrollment.enrollment_id}>
+                <td>#{enrollment.enrollment_id}</td>
+                {userRole !== 'STUDENT' && <td style={{ fontWeight: 600 }}>{enrollment.student_name}</td>}
+                <td>{enrollment.course_title}</td>
+                <td>
+                  <span className={`badge ${enrollment.status === 'active' ? 'success' : enrollment.status === 'completed' ? 'info' : 'danger'}`}>
+                    {enrollment.status.toUpperCase()}
+                  </span>
+                </td>
+                <td style={{ color: 'var(--text-secondary)' }}>{enrollment.enrollment_date}</td>
+                {userRole === 'STUDENT' && (
+                  <td>
+                    {enrollment.status === 'active' && (
+                      <button className="btn btn-sm btn-primary" onClick={() => alert(`Launching: ${enrollment.course_title}`)}>
+                        📘 Learn Course
+                      </button>
+                    )}
+                  </td>
+                )}
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={userRole === 'STUDENT' ? 5 : 4}>
+                  <div className="empty-state">
+                    <div className="empty-state-icon">📝</div>
+                    <div className="empty-state-title">No enrollments found</div>
+                    <div className="empty-state-desc">Complete a payment to get enrolled in a course.</div>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }

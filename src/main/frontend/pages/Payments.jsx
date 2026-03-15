@@ -1,181 +1,213 @@
-import React, { useState } from 'react';
-import { mockPayments, mockCourses, mockUsers } from '../data/mockData';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { paymentsAPI, reservationsAPI, adminAPI } from '../services/api';
 
 export default function Payments() {
-    const [payments, setPayments] = useState(mockPayments);
-    const [search, setSearch] = useState('');
-    const [showModal, setShowModal] = useState(false);
-    const [form, setForm] = useState({ courseName: '', studentName: '', amount: '' });
-    const userRole = localStorage.getItem('userRole') || 'ADMIN';
-    const navigate = useNavigate();
+  const [payments, setPayments] = useState([]);
+  const [pendingReservations, setPendingReservations] = useState([]);
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ reservation_id: '', payment_type: 'credit_card' });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const userRole = localStorage.getItem('userRole') || 'ADMIN';
+  const navigate = useNavigate();
 
-    const students = mockUsers.filter((u) => u.role === 'STUDENT');
+  useEffect(() => { fetchData(); }, []);
 
-    const filtered = payments.filter(
-        (p) =>
-            p.studentName.toLowerCase().includes(search.toLowerCase()) ||
-            p.courseName.toLowerCase().includes(search.toLowerCase()) ||
-            p.transactionStatus.toLowerCase().includes(search.toLowerCase())
-    );
+  const fetchData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      if (userRole === 'ADMIN') {
+        const data = await adminAPI.getPayments();
+        setPayments(data.payments);
+      } else if (userRole === 'STUDENT') {
+        const [payData, resData] = await Promise.all([
+          paymentsAPI.getAll(),
+          reservationsAPI.getAll(),
+        ]);
+        setPayments(payData.payments);
+        setPendingReservations(resData.reservations.filter((r) => r.status === 'pending'));
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const totalRevenue = payments.filter((p) => p.transactionStatus === 'SUCCESS').reduce((s, p) => s + p.amount, 0);
+  const handlePay = async (e) => {
+    e.preventDefault();
+    if (!form.reservation_id) return alert('Select a reservation');
+    setSaving(true);
+    try {
+      // Find the amount from the selected reservation's course price
+      const res = pendingReservations.find((r) => r.reservation_id === parseInt(form.reservation_id));
+      const amount = res?.course_price || 0;
 
-    const handleProcess = (e) => {
-        e.preventDefault();
-        const newPayment = {
-            paymentId: Date.now(),
-            courseName: form.courseName,
-            studentName: form.studentName,
-            amount: parseFloat(form.amount),
-            paymentDate: new Date().toISOString().split('T')[0],
-            transactionStatus: 'SUCCESS',
-        };
-        setPayments([newPayment, ...payments]);
-        setShowModal(false);
-        setForm({ courseName: '', studentName: '', amount: '' });
+      const data = await paymentsAPI.make(
+        parseInt(form.reservation_id),
+        amount,
+        form.payment_type
+      );
+      alert('Payment successful! You are now enrolled.');
+      setShowModal(false);
+      setForm({ reservation_id: '', payment_type: 'credit_card' });
+      navigate('/enrollments');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
-        if (userRole === 'STUDENT') {
-            alert('Payment Successful! You are now enrolled in the course.');
-            navigate('/enrollments');
-        }
-    };
+  const filtered = payments.filter(
+    (p) =>
+      String(p.reservation_id).includes(search) ||
+      p.payment_type.toLowerCase().includes(search.toLowerCase())
+  );
 
-    return (
-        <div className="slide-up">
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title">Payments</h1>
-                    <p className="page-subtitle">{userRole === 'STUDENT' ? 'Make and track your course payments' : 'Track and process course payments'}</p>
-                </div>
-                {userRole === 'STUDENT' ? (
-                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>💳 Make Payment</button>
-                ) : (
-                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Process Payment</button>
-                )}
-            </div>
+  const totalRevenue = payments.reduce((s, p) => s + p.amount, 0);
 
-            {/* Revenue Stats */}
-            {userRole === 'ADMIN' && (
-                <div className="stats-grid" style={{ marginBottom: '24px' }}>
-                    <div className="stat-card emerald">
-                        <div className="stat-icon emerald">💰</div>
-                        <div className="stat-value">₹{totalRevenue.toLocaleString()}</div>
-                        <div className="stat-label">Total Revenue</div>
-                    </div>
-                    <div className="stat-card blue">
-                        <div className="stat-icon blue">✅</div>
-                        <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'SUCCESS').length}</div>
-                        <div className="stat-label">Successful</div>
-                    </div>
-                    <div className="stat-card amber">
-                        <div className="stat-icon amber">⏳</div>
-                        <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'PENDING').length}</div>
-                        <div className="stat-label">Pending</div>
-                    </div>
-                    <div className="stat-card rose">
-                        <div className="stat-icon rose">❌</div>
-                        <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'FAILED').length}</div>
-                        <div className="stat-label">Failed</div>
-                    </div>
-                </div>
-            )}
+  if (loading) return <div className="slide-up" style={{ color: 'var(--text-secondary)', padding: '40px' }}>Loading payments...</div>;
 
-            <div className="table-wrapper">
-                <div className="table-header">
-                    <h3 className="table-title">Transaction History ({filtered.length})</h3>
-                    <div className="table-search">
-                        <span>🔍</span>
-                        <input placeholder="Search payments..." value={search} onChange={(e) => setSearch(e.target.value)} />
-                    </div>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Student</th>
-                            <th>Course</th>
-                            <th>Amount</th>
-                            <th>Date</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filtered.map((payment) => (
-                            <tr key={payment.paymentId}>
-                                <td>#{payment.paymentId}</td>
-                                <td style={{ fontWeight: 600 }}>{payment.studentName}</td>
-                                <td>{payment.courseName}</td>
-                                <td style={{ fontWeight: 600 }}>₹{payment.amount.toLocaleString()}</td>
-                                <td style={{ color: 'var(--text-secondary)' }}>{payment.paymentDate}</td>
-                                <td>
-                                    <span className={`badge ${payment.transactionStatus === 'SUCCESS' ? 'success' : payment.transactionStatus === 'PENDING' ? 'warning' : 'danger'}`}>
-                                        {payment.transactionStatus}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
-                        {filtered.length === 0 && (
-                            <tr>
-                                <td colSpan="6">
-                                    <div className="empty-state">
-                                        <div className="empty-state-icon">💳</div>
-                                        <div className="empty-state-title">No payments found</div>
-                                        <div className="empty-state-desc">Try adjusting your search or process a new payment.</div>
-                                    </div>
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Modal */}
-            {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3 className="modal-title">Process Payment</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
-                        </div>
-                        <form onSubmit={handleProcess}>
-                            <div className="modal-body">
-                                <div className="form-group">
-                                    <label className="form-label">Student</label>
-                                    <select className="form-select" value={form.studentName} onChange={(e) => setForm({ ...form, studentName: e.target.value })} required>
-                                        <option value="">Select a student</option>
-                                        {students.map((s) => (
-                                            <option key={s.userId} value={s.name}>{s.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label className="form-label">Course</label>
-                                        <select className="form-select" value={form.courseName} onChange={(e) => {
-                                            const course = mockCourses.find((c) => c.title === e.target.value);
-                                            setForm({ ...form, courseName: e.target.value, amount: course ? course.fee : '' });
-                                        }} required>
-                                            <option value="">Select a course</option>
-                                            {mockCourses.map((c) => (
-                                                <option key={c.courseId} value={c.title}>{c.title}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Amount (₹)</label>
-                                        <input className="form-input" type="number" placeholder="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">Process Payment</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+  return (
+    <div className="slide-up">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Payments</h1>
+          <p className="page-subtitle">{userRole === 'STUDENT' ? 'Make and track your course payments' : 'Track all course payments'}</p>
         </div>
-    );
+        {userRole === 'STUDENT' && (
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>💳 Make Payment</button>
+        )}
+      </div>
+
+      {error && <div style={{ color: '#f87171', marginBottom: '16px' }}>⚠️ {error}</div>}
+
+      {/* Revenue Stats — Admin only */}
+      {userRole === 'ADMIN' && (
+        <div className="stats-grid" style={{ marginBottom: '24px' }}>
+          <div className="stat-card emerald">
+            <div className="stat-icon emerald">💰</div>
+            <div className="stat-value">₹{totalRevenue.toLocaleString()}</div>
+            <div className="stat-label">Total Revenue</div>
+          </div>
+          <div className="stat-card blue">
+            <div className="stat-icon blue">✅</div>
+            <div className="stat-value">{payments.length}</div>
+            <div className="stat-label">Total Payments</div>
+          </div>
+        </div>
+      )}
+
+      <div className="table-wrapper">
+        <div className="table-header">
+          <h3 className="table-title">Transaction History ({filtered.length})</h3>
+          <div className="table-search">
+            <span>🔍</span>
+            <input placeholder="Search payments..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Reservation</th>
+              <th>Amount</th>
+              <th>Type</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((payment) => (
+              <tr key={payment.payment_id}>
+                <td>#{payment.payment_id}</td>
+                <td>Res #{payment.reservation_id}</td>
+                <td style={{ fontWeight: 600 }}>₹{payment.amount.toLocaleString()}</td>
+                <td style={{ textTransform: 'capitalize' }}>{payment.payment_type.replace('_', ' ')}</td>
+                <td style={{ color: 'var(--text-secondary)' }}>{payment.payment_date}</td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan="5">
+                  <div className="empty-state">
+                    <div className="empty-state-icon">💳</div>
+                    <div className="empty-state-title">No payments found</div>
+                    <div className="empty-state-desc">
+                      {userRole === 'STUDENT' ? 'Reserve a course and make a payment to get enrolled.' : 'No payments recorded yet.'}
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Payment Modal — Students only */}
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">💳 Make Payment</h3>
+              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handlePay}>
+              <div className="modal-body">
+                {pendingReservations.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
+                    No pending reservations. Reserve a course first.
+                  </div>
+                ) : (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">Select Reservation</label>
+                      <select
+                        className="form-select"
+                        value={form.reservation_id}
+                        onChange={(e) => setForm({ ...form, reservation_id: e.target.value })}
+                        required
+                      >
+                        <option value="">Choose a pending reservation</option>
+                        {pendingReservations.map((r) => (
+                          <option key={r.reservation_id} value={r.reservation_id}>
+                            {r.course_title} — ₹{r.course_price?.toLocaleString() || 'N/A'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Payment Method</label>
+                      <select
+                        className="form-select"
+                        value={form.payment_type}
+                        onChange={(e) => setForm({ ...form, payment_type: e.target.value })}
+                      >
+                        <option value="credit_card">Credit Card</option>
+                        <option value="upi">UPI</option>
+                        <option value="cash">Cash</option>
+                        <option value="net_banking">Net Banking</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                {pendingReservations.length > 0 && (
+                  <button type="submit" className="btn btn-primary" disabled={saving}>
+                    {saving ? 'Processing...' : '✅ Confirm Payment'}
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

@@ -21,9 +21,8 @@ class Bugs extends PackageUrlCmd {
 
     // try to get it from the repo, if possible
     const info = this.hostedFromMani(mani)
-    const infoUrl = info?.bugs()
-    if (infoUrl) {
-      return infoUrl
+    if (info) {
+      return info.bugs()
     }
 
     // just send them to the website, hopefully that has some info!
