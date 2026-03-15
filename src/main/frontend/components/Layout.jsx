@@ -32,6 +32,23 @@ export default function Layout() {
         return segment.charAt(0).toUpperCase() + segment.slice(1);
     };
 
+    const userRole = localStorage.getItem('userRole') || 'ADMIN';
+
+    // Filter nav items conditionally based on role
+    const filteredNavItems = navItems.map(section => {
+        let items = section.items;
+        
+        if (userRole === 'STUDENT') {
+            const allowed = ['/', '/courses', '/enrollments', '/reservations', '/payments'];
+            items = items.filter(item => allowed.includes(item.to));
+        } else if (userRole === 'INSTRUCTOR') {
+            const allowed = ['/', '/courses', '/enrollments'];
+            items = items.filter(item => allowed.includes(item.to));
+        }
+        
+        return { ...section, items };
+    }).filter(section => section.items.length > 0);
+
     return (
         <div className="app-layout">
             {/* Sidebar */}
@@ -40,11 +57,11 @@ export default function Layout() {
                     <div className="sidebar-logo-icon">C</div>
                     <div className="sidebar-logo-text">
                         CourseHub
-                        <span>Management System</span>
+                        <span>{userRole === 'STUDENT' ? 'Student Portal' : userRole === 'INSTRUCTOR' ? 'Instructor Portal' : 'Admin Panel'}</span>
                     </div>
                 </div>
                 <nav className="sidebar-nav">
-                    {navItems.map((section) => (
+                    {filteredNavItems.map((section) => (
                         <div key={section.section}>
                             <div className="sidebar-section-label">{section.section}</div>
                             {section.items.map((item) => (
@@ -68,10 +85,11 @@ export default function Layout() {
                 <header className="header">
                     <h2 className="header-title">{getPageTitle()}</h2>
                     <div className="header-actions">
-                        <NavLink to="/login" className="btn btn-sm btn-secondary">
-                            🔐 Login
+                        <span className="badge" style={{marginRight: '15px'}}>{userRole}</span>
+                        <NavLink to="/login" className="btn btn-sm btn-secondary" onClick={() => localStorage.removeItem('userRole')}>
+                            {userRole !== 'ADMIN' ? '🔄 Switch Role' : '🔐 Logout'}
                         </NavLink>
-                        <div className="header-avatar">A</div>
+                        <div className="header-avatar">{userRole.charAt(0)}</div>
                     </div>
                 </header>
                 <main className="page-content fade-in">

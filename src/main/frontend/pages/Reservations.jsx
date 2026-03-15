@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { mockReservations, mockCourses } from '../data/mockData';
+import { useNavigate } from 'react-router-dom';
 
 export default function Reservations() {
     const [reservations, setReservations] = useState(mockReservations);
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [form, setForm] = useState({ courseName: '', expiryDate: '' });
+    const userRole = localStorage.getItem('userRole') || 'ADMIN';
+    const navigate = useNavigate();
 
     const filtered = reservations.filter(
         (r) =>
@@ -41,7 +44,9 @@ export default function Reservations() {
                     <h1 className="page-title">Reservations</h1>
                     <p className="page-subtitle">Manage course seat reservations</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Reservation</button>
+                {userRole !== 'STUDENT' && (
+                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Reservation</button>
+                )}
             </div>
 
             <div className="table-wrapper">
@@ -76,9 +81,18 @@ export default function Reservations() {
                                 <td>
                                     <div className="action-buttons">
                                         {res.status === 'PENDING' && (
-                                            <button className="btn btn-sm btn-primary" onClick={() => handleConfirm(res.reservationId)}>
-                                                ✓ Confirm
-                                            </button>
+                                            userRole === 'STUDENT' ? (
+                                                <button className="btn btn-sm btn-primary" onClick={() => {
+                                                    alert('Redirecting to payment gateway...');
+                                                    navigate('/payments');
+                                                }}>
+                                                    💳 Pay Now
+                                                </button>
+                                            ) : (
+                                                <button className="btn btn-sm btn-primary" onClick={() => handleConfirm(res.reservationId)}>
+                                                    ✓ Confirm
+                                                </button>
+                                            )
                                         )}
                                         {res.status !== 'CANCELLED' && (
                                             <button className="btn btn-sm btn-danger" onClick={() => handleCancel(res.reservationId)}>

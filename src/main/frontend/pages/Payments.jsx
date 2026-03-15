@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { mockPayments, mockCourses, mockUsers } from '../data/mockData';
+import { useNavigate } from 'react-router-dom';
 
 export default function Payments() {
     const [payments, setPayments] = useState(mockPayments);
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [form, setForm] = useState({ courseName: '', studentName: '', amount: '' });
+    const userRole = localStorage.getItem('userRole') || 'ADMIN';
+    const navigate = useNavigate();
 
     const students = mockUsers.filter((u) => u.role === 'STUDENT');
 
@@ -31,6 +34,11 @@ export default function Payments() {
         setPayments([newPayment, ...payments]);
         setShowModal(false);
         setForm({ courseName: '', studentName: '', amount: '' });
+
+        if (userRole === 'STUDENT') {
+            alert('Payment Successful! You are now enrolled in the course.');
+            navigate('/enrollments');
+        }
     };
 
     return (
@@ -38,34 +46,40 @@ export default function Payments() {
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Payments</h1>
-                    <p className="page-subtitle">Track and process course payments</p>
+                    <p className="page-subtitle">{userRole === 'STUDENT' ? 'Make and track your course payments' : 'Track and process course payments'}</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Process Payment</button>
+                {userRole === 'STUDENT' ? (
+                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>💳 Make Payment</button>
+                ) : (
+                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Process Payment</button>
+                )}
             </div>
 
             {/* Revenue Stats */}
-            <div className="stats-grid" style={{ marginBottom: '24px' }}>
-                <div className="stat-card emerald">
-                    <div className="stat-icon emerald">💰</div>
-                    <div className="stat-value">₹{totalRevenue.toLocaleString()}</div>
-                    <div className="stat-label">Total Revenue</div>
+            {userRole === 'ADMIN' && (
+                <div className="stats-grid" style={{ marginBottom: '24px' }}>
+                    <div className="stat-card emerald">
+                        <div className="stat-icon emerald">💰</div>
+                        <div className="stat-value">₹{totalRevenue.toLocaleString()}</div>
+                        <div className="stat-label">Total Revenue</div>
+                    </div>
+                    <div className="stat-card blue">
+                        <div className="stat-icon blue">✅</div>
+                        <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'SUCCESS').length}</div>
+                        <div className="stat-label">Successful</div>
+                    </div>
+                    <div className="stat-card amber">
+                        <div className="stat-icon amber">⏳</div>
+                        <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'PENDING').length}</div>
+                        <div className="stat-label">Pending</div>
+                    </div>
+                    <div className="stat-card rose">
+                        <div className="stat-icon rose">❌</div>
+                        <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'FAILED').length}</div>
+                        <div className="stat-label">Failed</div>
+                    </div>
                 </div>
-                <div className="stat-card blue">
-                    <div className="stat-icon blue">✅</div>
-                    <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'SUCCESS').length}</div>
-                    <div className="stat-label">Successful</div>
-                </div>
-                <div className="stat-card amber">
-                    <div className="stat-icon amber">⏳</div>
-                    <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'PENDING').length}</div>
-                    <div className="stat-label">Pending</div>
-                </div>
-                <div className="stat-card rose">
-                    <div className="stat-icon rose">❌</div>
-                    <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'FAILED').length}</div>
-                    <div className="stat-label">Failed</div>
-                </div>
-            </div>
+            )}
 
             <div className="table-wrapper">
                 <div className="table-header">

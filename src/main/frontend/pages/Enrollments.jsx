@@ -6,6 +6,7 @@ export default function Enrollments() {
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [form, setForm] = useState({ studentName: '', courseName: '' });
+    const userRole = localStorage.getItem('userRole') || 'ADMIN';
 
     const students = mockUsers.filter((u) => u.role === 'STUDENT');
 
@@ -39,9 +40,11 @@ export default function Enrollments() {
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Enrollments</h1>
-                    <p className="page-subtitle">Manage student course enrollments</p>
+                    <p className="page-subtitle">{userRole === 'STUDENT' ? 'Your active and past course enrollments' : 'Manage student course enrollments'}</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Enrollment</button>
+                {userRole !== 'STUDENT' && (
+                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Enrollment</button>
+                )}
             </div>
 
             <div className="table-wrapper">
@@ -78,9 +81,15 @@ export default function Enrollments() {
                                 <td>
                                     <div className="action-buttons">
                                         {enrollment.status === 'ACTIVE' && (
-                                            <button className="btn btn-sm btn-danger" onClick={() => handleDrop(enrollment.enrollmentId)}>
-                                                Drop
-                                            </button>
+                                            userRole === 'STUDENT' ? (
+                                                <button className="btn btn-sm btn-primary" onClick={() => alert(`Launching course content for: ${enrollment.courseName}`)}>
+                                                    📘 Learn Course
+                                                </button>
+                                            ) : (
+                                                <button className="btn btn-sm btn-danger" onClick={() => handleDrop(enrollment.enrollmentId)}>
+                                                    Drop
+                                                </button>
+                                            )
                                         )}
                                     </div>
                                 </td>

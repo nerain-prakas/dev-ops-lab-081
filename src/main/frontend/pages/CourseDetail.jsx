@@ -1,10 +1,12 @@
 import React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { mockCourses, mockEnrollments } from '../data/mockData';
 
 export default function CourseDetail() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const course = mockCourses.find((c) => c.courseId === parseInt(id));
+    const userRole = localStorage.getItem('userRole') || 'ADMIN';
 
     if (!course) {
         return (
@@ -36,6 +38,19 @@ export default function CourseDetail() {
                     <h1>{course.title}</h1>
                     <p>Taught by {course.instructor}</p>
                 </div>
+                {userRole === 'STUDENT' && availableSeats > 0 && (
+                    <div style={{ marginLeft: 'auto' }}>
+                        <button 
+                            className="btn btn-primary" 
+                            onClick={() => {
+                                alert(`'${course.title}' has been reserved! Please complete the payment to finalize enrollment.`);
+                                navigate('/reservations');
+                            }}
+                        >
+                            🎫 Reserve Seat
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="detail-stats">

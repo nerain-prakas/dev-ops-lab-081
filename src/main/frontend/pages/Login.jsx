@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
     const navigate = useNavigate();
-    const [form, setForm] = useState({ email: '', password: '' });
+    const [form, setForm] = useState({ email: '', password: '', role: 'STUDENT' });
 
     const handleSubmit = (e) => {
         e.preventDefault();
         // TODO: Replace with actual API call to POST /api/users/login
+        // Save mock role to localStorage for demo
+        localStorage.setItem('userRole', form.role);
         navigate('/');
     };
 
@@ -42,6 +44,18 @@ export default function Login() {
                             onChange={(e) => setForm({ ...form, password: e.target.value })}
                             required
                         />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Login As</label>
+                        <select 
+                            className="form-input" 
+                            value={form.role} 
+                            onChange={(e) => setForm({...form, role: e.target.value})}
+                        >
+                            <option value="STUDENT">Student</option>
+                            <option value="INSTRUCTOR">Instructor</option>
+                            <option value="ADMIN">Admin</option>
+                        </select>
                     </div>
                     <button type="submit" className="btn btn-primary login-btn">
                         Sign In →
