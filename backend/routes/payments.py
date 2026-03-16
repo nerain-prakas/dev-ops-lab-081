@@ -4,7 +4,7 @@ from models.payment import Payment
 from models.reservation import Reservation
 from models.enrollment import Enrollment
 from datetime import date
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from utils.jwt_auth import jwt_required, get_jwt_identity
 
 payments_bp = Blueprint("payments", __name__)
 

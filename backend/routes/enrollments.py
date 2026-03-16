@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify
 from models.enrollment import Enrollment
 from models.student import Student
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from utils.jwt_auth import jwt_required, get_jwt_identity
 
 enrollments_bp = Blueprint("enrollments", __name__)
 

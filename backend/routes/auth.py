@@ -3,7 +3,7 @@ from database.db import db
 from models.user import User
 from models.student import Student
 from models.instructor import Instructor
-from flask_jwt_extended import create_access_token
+from utils.jwt_auth import create_access_token
 
 auth_bp = Blueprint("auth", __name__)
 

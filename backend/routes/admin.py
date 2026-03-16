@@ -7,7 +7,7 @@ from models.course import Course
 from models.reservation import Reservation
 from models.payment import Payment
 from models.enrollment import Enrollment
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from utils.jwt_auth import jwt_required, get_jwt_identity
 from functools import wraps
 
 admin_bp = Blueprint("admin", __name__)

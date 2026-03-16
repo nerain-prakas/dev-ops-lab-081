@@ -4,7 +4,7 @@ from models.reservation import Reservation
 from models.course import Course
 from models.student import Student
 from datetime import date
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from utils.jwt_auth import jwt_required, get_jwt_identity
 
 reservations_bp = Blueprint("reservations", __name__)
 

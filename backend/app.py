@@ -1,5 +1,4 @@
 from flask import Flask, jsonify
-from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 
 from config import Config
@@ -27,21 +26,23 @@ def create_app() -> Flask:
 
     # Initialize extensions
     db.init_app(app)
-    JWTManager(app)
     CORS(app, resources={r"/*": {"origins": "*"}})
 
     # Register blueprints (all routes have /api prefix)
-    app.register_blueprint(auth_bp,          url_prefix="/api")
-    app.register_blueprint(courses_bp,       url_prefix="/api")
-    app.register_blueprint(reservations_bp,  url_prefix="/api")
-    app.register_blueprint(payments_bp,      url_prefix="/api")
-    app.register_blueprint(enrollments_bp,   url_prefix="/api")
-    app.register_blueprint(admin_bp,         url_prefix="/api")
+    app.register_blueprint(auth_bp, url_prefix="/api")
+    app.register_blueprint(courses_bp, url_prefix="/api")
+    app.register_blueprint(reservations_bp, url_prefix="/api")
+    app.register_blueprint(payments_bp, url_prefix="/api")
+    app.register_blueprint(enrollments_bp, url_prefix="/api")
+    app.register_blueprint(admin_bp, url_prefix="/api")
 
-    # Create all database tables on startup
-    with app.app_context():
-        db.create_all()
-        print("✅ Database tables created/verified successfully.")
+    # For hosted databases like Supabase, schema should be managed separately.
+    if app.config.get("AUTO_CREATE_TABLES"):
+        with app.app_context():
+            db.create_all()
+            print("Database tables created/verified successfully.")
+    else:
+        print("AUTO_CREATE_TABLES is disabled; using existing database schema.")
 
     # ------------------------------------------------------------------
     # Global error handlers
@@ -64,13 +65,15 @@ def create_app() -> Flask:
     @app.route("/api/health", methods=["GET"])
     def health():
         return jsonify({
-            "status":  "ok",
+            "status": "ok",
             "message": "Online Course Reservation System API is running"
         }), 200
 
     return app
 
 
+app = create_app()
+
+
 if __name__ == "__main__":
-    app = create_app()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=Config.DEBUG)

@@ -10,6 +10,9 @@ class Config:
         "postgresql://postgres:password@localhost:5432/course_reservation_db"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+    }
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-secret-key")
-    JWT_ACCESS_TOKEN_EXPIRES = False  # Tokens don't expire (adjust for production)
     DEBUG = os.getenv("FLASK_DEBUG", "True") == "True"
+    AUTO_CREATE_TABLES = os.getenv("AUTO_CREATE_TABLES", "False") == "True"

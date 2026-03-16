@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from database.db import db
 from models.course import Course
 from models.instructor import Instructor
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from utils.jwt_auth import jwt_required, get_jwt_identity
 
 courses_bp = Blueprint("courses", __name__)
 
