@@ -38,10 +38,14 @@ def create_app() -> Flask:
     app.register_blueprint(enrollments_bp,   url_prefix="/api")
     app.register_blueprint(admin_bp,         url_prefix="/api")
 
-    # Create all database tables on startup
+    # Create all database tables on startup (skip gracefully if DB unreachable)
     with app.app_context():
-        db.create_all()
-        print("✅ Database tables created/verified successfully.")
+        try:
+            db.create_all()
+            print("[OK] Database tables created/verified successfully.")
+        except Exception as e:
+            print(f"[WARN] Could not reach database at startup: {e}")
+            print("       App will start anyway - DB will be checked on first request.")
 
     # ------------------------------------------------------------------
     # Global error handlers

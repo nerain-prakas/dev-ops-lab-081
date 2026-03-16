@@ -71,18 +71,74 @@ def login():
     POST /login
     Authenticate an existing user and return a JWT token.
     Body: { email, password }
+
+    DEMO ACCOUNTS (bypass DB — for UI demonstration):
+      admin@demo.com      / demo1234
+      instructor@demo.com / demo1234
+      student@demo.com    / demo1234
     """
     data = request.get_json()
     if not data:
         return jsonify({"error": "No input data provided"}), 400
 
-    email    = data.get("email", "").strip()
+    email    = data.get("email", "").strip().lower()
     password = data.get("password", "")
 
     if not email or not password:
         return jsonify({"error": "Email and password are required"}), 400
 
-    user = User.query.filter_by(email=email).first()
+    # ── Demo accounts (no DB required) ───────────────────────────────────
+    DEMO_USERS = {
+        "admin@demo.com": {
+            "password": "demo1234",
+            "identity": {"user_id": 9001, "role": "admin", "is_admin": True},
+            "user": {
+                "user_id": 9001,
+                "name":    "Demo Admin",
+                "email":   "admin@demo.com",
+                "role":    "admin",
+            },
+        },
+        "instructor@demo.com": {
+            "password": "demo1234",
+            "identity": {"user_id": 9002, "role": "instructor", "instructor_id": 9002},
+            "user": {
+                "user_id": 9002,
+                "name":    "Demo Instructor",
+                "email":   "instructor@demo.com",
+                "role":    "instructor",
+            },
+        },
+        "student@demo.com": {
+            "password": "demo1234",
+            "identity": {"user_id": 9003, "role": "student", "student_id": 9003},
+            "user": {
+                "user_id": 9003,
+                "name":    "Demo Student",
+                "email":   "student@demo.com",
+                "role":    "student",
+            },
+        },
+    }
+
+    if email in DEMO_USERS:
+        demo = DEMO_USERS[email]
+        if password != demo["password"]:
+            return jsonify({"error": "Invalid email or password"}), 401
+        access_token = create_access_token(identity=demo["identity"])
+        return jsonify({
+            "message":      "Login successful (demo account)",
+            "access_token": access_token,
+            "user":         demo["user"],
+        }), 200
+    # ── End demo accounts ─────────────────────────────────────────────────
+
+    # Normal DB-backed login
+    try:
+        user = User.query.filter_by(email=email).first()
+    except Exception:
+        return jsonify({"error": "Database unavailable. Use a demo account (admin@demo.com, instructor@demo.com, student@demo.com) with password demo1234"}), 503
+
     if not user or not user.check_password(password):
         return jsonify({"error": "Invalid email or password"}), 401
 
