@@ -4,29 +4,21 @@ from models.payment import Payment
 from models.reservation import Reservation
 from models.enrollment import Enrollment
 from datetime import date
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
+from utils.decorators import role_required
 
 payments_bp = Blueprint("payments", __name__)
 
 
 @payments_bp.route("/payment", methods=["POST"])
-@jwt_required()
+@role_required("student")
 def make_payment():
     """
     POST /payment
     Student only — process payment for a pending reservation.
     Body: { reservation_id, amount, payment_type }
-
-    Business logic:
-    1. Verify reservation belongs to the logged-in student.
-    2. Verify reservation is still 'pending'.
-    3. Create a Payment record.
-    4. Call reservation.confirm() to update status → 'confirmed'.
-    5. Auto-create an Enrollment record.
     """
     identity = get_jwt_identity()
-    if identity.get("role") != "student":
-        return jsonify({"error": "Access denied: Students only"}), 403
 
     data = request.get_json()
     if not data:
@@ -49,7 +41,6 @@ def make_payment():
     if reservation.status != "pending":
         return jsonify({"error": f"Cannot pay for a reservation with status '{reservation.status}'"}), 400
 
-    # Step 3: Record payment
     payment = Payment(
         reservation_id = reservation.reservation_id,
         amount         = float(data["amount"]),
@@ -58,10 +49,8 @@ def make_payment():
     )
     db.session.add(payment)
 
-    # Step 4: Confirm the reservation
     reservation.confirm()
 
-    # Step 5: Auto-create enrollment
     enrollment = Enrollment(
         student_id      = reservation.student_id,
         course_id       = reservation.course_id,
@@ -79,16 +68,13 @@ def make_payment():
 
 
 @payments_bp.route("/payments", methods=["GET"])
-@jwt_required()
+@role_required("student")
 def get_payments():
     """
     GET /payments
-    Returns all payments for the logged-in student's reservations.
+    Student only — returns all payments for the logged-in student's reservations.
     """
     identity = get_jwt_identity()
-    if identity.get("role") != "student":
-        return jsonify({"error": "Access denied: Students only"}), 403
-
     student_id = identity.get("student_id")
     reservations = Reservation.query.filter_by(student_id=student_id).all()
     reservation_ids = [r.reservation_id for r in reservations]

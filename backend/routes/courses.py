@@ -2,7 +2,8 @@ from flask import Blueprint, request, jsonify
 from database.db import db
 from models.course import Course
 from models.instructor import Instructor
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
+from utils.decorators import role_required
 
 courses_bp = Blueprint("courses", __name__)
 
@@ -47,7 +48,7 @@ def get_course(course_id: int):
 
 
 @courses_bp.route("/courses", methods=["POST"])
-@jwt_required()
+@role_required("instructor")
 def create_course():
     """
     POST /courses
@@ -55,8 +56,6 @@ def create_course():
     Body: { title, description, price, total_seats }
     """
     identity = get_jwt_identity()
-    if identity.get("role") != "instructor":
-        return jsonify({"error": "Access denied: Instructors only"}), 403
 
     instructor = Instructor.query.filter_by(user_id=identity["user_id"]).first()
     if not instructor:
@@ -90,23 +89,20 @@ def create_course():
 
 
 @courses_bp.route("/courses/<int:course_id>", methods=["PUT"])
-@jwt_required()
+@role_required("instructor")
 def update_course(course_id: int):
     """
     PUT /courses/<id>
     Instructor only — updates their own course.
     Body: { title?, description?, price?, total_seats? }
     """
-    identity = get_jwt_identity()
-    if identity.get("role") != "instructor":
-        return jsonify({"error": "Access denied: Instructors only"}), 403
-
+    identity   = get_jwt_identity()
     instructor = Instructor.query.filter_by(user_id=identity["user_id"]).first()
     course     = Course.query.get(course_id)
 
     if not course:
         return jsonify({"error": "Course not found"}), 404
-    if course.instructor_id != instructor.instructor_id:
+    if not instructor or course.instructor_id != instructor.instructor_id:
         return jsonify({"error": "Access denied: Not your course"}), 403
 
     data = request.get_json() or {}
@@ -126,24 +122,40 @@ def update_course(course_id: int):
 
 
 @courses_bp.route("/courses/<int:course_id>", methods=["DELETE"])
-@jwt_required()
+@role_required("instructor")
 def delete_course(course_id: int):
     """
     DELETE /courses/<id>
     Instructor only — deletes their own course.
     """
-    identity = get_jwt_identity()
-    if identity.get("role") != "instructor":
-        return jsonify({"error": "Access denied: Instructors only"}), 403
-
+    identity   = get_jwt_identity()
     instructor = Instructor.query.filter_by(user_id=identity["user_id"]).first()
     course     = Course.query.get(course_id)
 
     if not course:
         return jsonify({"error": "Course not found"}), 404
-    if course.instructor_id != instructor.instructor_id:
+    if not instructor or course.instructor_id != instructor.instructor_id:
         return jsonify({"error": "Access denied: Not your course"}), 403
 
     db.session.delete(course)
     db.session.commit()
     return jsonify({"message": "Course deleted successfully"}), 200
+
+
+@courses_bp.route("/courses/my", methods=["GET"])
+@role_required("instructor")
+def get_my_courses():
+    """
+    GET /courses/my
+    Instructor only — returns only the courses belonging to the logged-in instructor.
+    """
+    identity   = get_jwt_identity()
+    instructor = Instructor.query.filter_by(user_id=identity["user_id"]).first()
+    if not instructor:
+        return jsonify({"error": "Instructor profile not found"}), 404
+
+    courses = Course.query.filter_by(instructor_id=instructor.instructor_id).all()
+    return jsonify({
+        "total":   len(courses),
+        "courses": [c.to_dict() for c in courses]
+    }), 200

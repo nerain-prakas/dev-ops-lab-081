@@ -4,14 +4,15 @@ import { getRole, getToken } from '../lib/auth';
 
 export default function Enrollments() {
     const token = getToken();
-    const role = getRole();
+    const role  = getRole();
     const [enrollments, setEnrollments] = useState([]);
-    const [search, setSearch] = useState('');
-    const [error, setError] = useState('');
+    const [search, setSearch]           = useState('');
+    const [error, setError]             = useState('');
 
     useEffect(() => {
-        async function loadEnrollments() {
+        async function load() {
             try {
+                // admin uses /admin/enrollments, student+instructor use /enrollments
                 const endpoint = role === 'admin' ? '/admin/enrollments' : '/enrollments';
                 const data = await apiRequest(endpoint, { token });
                 setEnrollments(data.enrollments || []);
@@ -19,58 +20,99 @@ export default function Enrollments() {
                 setError(err.message);
             }
         }
-
-        loadEnrollments();
+        load();
     }, [role, token]);
 
-    const filtered = enrollments.filter((item) =>
-        String(item.student_name || '').toLowerCase().includes(search.toLowerCase()) ||
-        String(item.course_title || '').toLowerCase().includes(search.toLowerCase()) ||
-        String(item.status || '').toLowerCase().includes(search.toLowerCase())
+    const filtered = enrollments.filter((e) =>
+        String(e.student_name  || '').toLowerCase().includes(search.toLowerCase()) ||
+        String(e.course_title  || '').toLowerCase().includes(search.toLowerCase()) ||
+        String(e.status        || '').toLowerCase().includes(search.toLowerCase())
     );
+
+    const subtitle = {
+        student:    'Your active and past course enrollments',
+        instructor: 'Students enrolled in your courses',
+        admin:      'All enrollments across the platform',
+    }[role] || '';
+
+    // Show student name column only for instructor/admin
+    const showStudentCol = role === 'instructor' || role === 'admin';
+    // Show price column only for admin
+    const showPriceCol   = role === 'admin';
 
     return (
         <div className="slide-up">
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Enrollments</h1>
-                    <p className="page-subtitle">{role === 'student' ? 'Your active and past course enrollments' : 'View course enrollments'}</p>
+                    <p className="page-subtitle">{subtitle}</p>
+                </div>
+                <div className="table-search">
+                    <span>🔍</span>
+                    <input
+                        placeholder="Search enrollments…"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
                 </div>
             </div>
 
-            {error && <div className="card" style={{ marginBottom: '20px' }}>{error}</div>}
+            {error && <div className="alert-error">{error}</div>}
+
+            {/* Stats summary */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                <div className="inline-stat emerald">
+                    <strong>{filtered.filter(e => e.status === 'active').length}</strong> Active
+                </div>
+                <div className="inline-stat blue">
+                    <strong>{filtered.filter(e => e.status === 'completed').length}</strong> Completed
+                </div>
+                <div className="inline-stat danger">
+                    <strong>{filtered.filter(e => e.status === 'dropped').length}</strong> Dropped
+                </div>
+                <div className="inline-stat">
+                    <strong>{filtered.length}</strong> Total
+                </div>
+            </div>
 
             <div className="table-wrapper">
                 <div className="table-header">
                     <h3 className="table-title">All Enrollments ({filtered.length})</h3>
-                    <div className="table-search">
-                        <span>S</span>
-                        <input placeholder="Search enrollments..." value={search} onChange={(e) => setSearch(e.target.value)} />
-                    </div>
                 </div>
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
-                            <th>Student</th>
+                            <th>#</th>
+                            {showStudentCol && <th>Student</th>}
                             <th>Course</th>
+                            {showPriceCol   && <th>Price</th>}
                             <th>Status</th>
                             <th>Date</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {filtered.map((item) => (
-                            <tr key={item.enrollment_id}>
-                                <td>#{item.enrollment_id}</td>
-                                <td>{item.student_name}</td>
-                                <td>{item.course_title}</td>
-                                <td><span className={`badge ${item.status === 'active' ? 'success' : item.status === 'completed' ? 'info' : 'danger'}`}>{String(item.status || '').toUpperCase()}</span></td>
-                                <td>{item.enrollment_date}</td>
+                        {filtered.map((e) => (
+                            <tr key={e.enrollment_id}>
+                                <td>#{e.enrollment_id}</td>
+                                {showStudentCol && <td>{e.student_name}</td>}
+                                <td>{e.course_title}</td>
+                                {showPriceCol   && <td>Rs {Number(e.course_price || 0).toFixed(2)}</td>}
+                                <td>
+                                    <span className={`badge ${
+                                        e.status === 'active'    ? 'success' :
+                                        e.status === 'completed' ? 'info'    : 'danger'
+                                    }`}>
+                                        {String(e.status || '').toUpperCase()}
+                                    </span>
+                                </td>
+                                <td>{e.enrollment_date}</td>
                             </tr>
                         ))}
                         {filtered.length === 0 && (
                             <tr>
-                                <td colSpan="5">No enrollments found.</td>
+                                <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                                    No enrollments found.
+                                </td>
                             </tr>
                         )}
                     </tbody>

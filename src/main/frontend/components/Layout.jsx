@@ -1,33 +1,46 @@
 import React from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { clearSession, getSession } from '../lib/auth';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { clearSession, getSession, getRole } from '../lib/auth';
 
-const navItems = [
-    {
-        section: 'Main', items: [
-            { to: '/', icon: 'D', label: 'Dashboard' },
-        ]
-    },
-    {
-        section: 'Management', items: [
-            { to: '/users', icon: 'U', label: 'Users' },
-            { to: '/courses', icon: 'C', label: 'Courses' },
-            { to: '/enrollments', icon: 'E', label: 'Enrollments' },
-        ]
-    },
-    {
-        section: 'Operations', items: [
-            { to: '/reservations', icon: 'R', label: 'Reservations' },
-            { to: '/payments', icon: 'P', label: 'Payments' },
-        ]
-    },
-];
+/* ─── Role-specific nav configuration ─────────────────────────────────────── */
+const NAV_CONFIG = {
+    student: [
+        { section: 'Main',       items: [{ to: '/',            icon: '⊞', label: 'Dashboard'    }] },
+        { section: 'Learning',   items: [{ to: '/courses',     icon: '🎓', label: 'Courses'      },
+                                          { to: '/enrollments', icon: '✓',  label: 'Enrollments'  }] },
+        { section: 'Bookings',   items: [{ to: '/reservations',icon: '📋', label: 'Reservations' },
+                                          { to: '/payments',    icon: '💳', label: 'Payments'     }] },
+    ],
+    instructor: [
+        { section: 'Main',       items: [{ to: '/',            icon: '⊞', label: 'Dashboard'    }] },
+        { section: 'Teaching',   items: [{ to: '/courses',     icon: '🎓', label: 'My Courses'   },
+                                          { to: '/enrollments', icon: '✓',  label: 'Enrollments'  }] },
+    ],
+    admin: [
+        { section: 'Main',       items: [{ to: '/',             icon: '⊞', label: 'Dashboard'    }] },
+        { section: 'Management', items: [{ to: '/users',        icon: '👥', label: 'Users'        },
+                                          { to: '/courses',      icon: '🎓', label: 'All Courses'  },
+                                          { to: '/enrollments',  icon: '✓',  label: 'Enrollments'  }] },
+        { section: 'Operations', items: [{ to: '/reservations', icon: '📋', label: 'Reservations' },
+                                          { to: '/payments',     icon: '💳', label: 'Payments'     }] },
+    ],
+};
+
+/* ─── Role badge colours ───────────────────────────────────────────────────── */
+const ROLE_META = {
+    student:    { label: 'Student Portal',    accent: 'var(--accent-emerald)', badge: 'success' },
+    instructor: { label: 'Instructor Portal', accent: 'var(--accent-purple)',  badge: 'purple'  },
+    admin:      { label: 'Admin Panel',       accent: 'var(--accent-amber)',   badge: 'warning' },
+};
 
 export default function Layout() {
     const location = useLocation();
-    const session = getSession();
-    const userRole = session?.role || 'admin';
-    const userName = session?.user?.name || 'User';
+    const navigate  = useNavigate();
+    const session   = getSession();
+    const role      = (session?.role || 'student').toLowerCase();
+    const userName  = session?.user?.name || 'User';
+    const meta      = ROLE_META[role] || ROLE_META.student;
+    const navItems  = NAV_CONFIG[role]  || NAV_CONFIG.student;
 
     const getPageTitle = () => {
         const path = location.pathname;
@@ -36,40 +49,35 @@ export default function Layout() {
         return segment.charAt(0).toUpperCase() + segment.slice(1);
     };
 
-    const filteredNavItems = navItems.map(section => {
-        let items = section.items;
-
-        if (userRole === 'student') {
-            const allowed = ['/', '/courses', '/enrollments', '/reservations', '/payments'];
-            items = items.filter(item => allowed.includes(item.to));
-        } else if (userRole === 'instructor') {
-            const allowed = ['/', '/courses', '/enrollments'];
-            items = items.filter(item => allowed.includes(item.to));
-        }
-
-        return { ...section, items };
-    }).filter(section => section.items.length > 0);
+    const handleLogout = () => {
+        clearSession();
+        navigate('/login');
+    };
 
     return (
         <div className="app-layout">
+            {/* ── Sidebar ─────────────────────────────────────────────────── */}
             <aside className="sidebar">
                 <div className="sidebar-logo">
-                    <div className="sidebar-logo-icon">C</div>
+                    <div className="sidebar-logo-icon" style={{ background: meta.accent }}>C</div>
                     <div className="sidebar-logo-text">
                         CourseHub
-                        <span>{userRole === 'student' ? 'Student Portal' : userRole === 'instructor' ? 'Instructor Portal' : 'Admin Panel'}</span>
+                        <span>{meta.label}</span>
                     </div>
                 </div>
+
                 <nav className="sidebar-nav">
-                    {filteredNavItems.map((section) => (
-                        <div key={section.section}>
+                    {navItems.map((section) => (
+                        <div key={section.section} className="sidebar-section">
                             <div className="sidebar-section-label">{section.section}</div>
                             {section.items.map((item) => (
                                 <NavLink
                                     key={item.to}
                                     to={item.to}
                                     end={item.to === '/'}
-                                    className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+                                    className={({ isActive }) =>
+                                        `sidebar-link${isActive ? ' active' : ''}`
+                                    }
                                 >
                                     <span className="sidebar-link-icon">{item.icon}</span>
                                     {item.label}
@@ -78,17 +86,50 @@ export default function Layout() {
                         </div>
                     ))}
                 </nav>
+
+                {/* User info at bottom of sidebar */}
+                <div className="sidebar-user">
+                    <div className="sidebar-user-avatar" style={{ background: meta.accent }}>
+                        {userName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="sidebar-user-info">
+                        <div className="sidebar-user-name">{userName}</div>
+                        <div className="sidebar-user-role">
+                            <span className={`badge ${meta.badge}`}>
+                                {role.toUpperCase()}
+                            </span>
+                        </div>
+                    </div>
+                    <button
+                        className="sidebar-logout-btn"
+                        onClick={handleLogout}
+                        title="Logout"
+                    >
+                        ⏻
+                    </button>
+                </div>
             </aside>
 
+            {/* ── Main area ───────────────────────────────────────────────── */}
             <div className="main-area">
                 <header className="header">
-                    <h2 className="header-title">{getPageTitle()}</h2>
+                    <div className="header-left">
+                        <h2 className="header-title">{getPageTitle()}</h2>
+                        <div
+                            className="header-role-indicator"
+                            style={{ borderColor: meta.accent, color: meta.accent }}
+                        >
+                            {meta.label}
+                        </div>
+                    </div>
                     <div className="header-actions">
-                        <span className="badge" style={{ marginRight: '15px' }}>{userRole.toUpperCase()}</span>
-                        <NavLink to="/login" className="btn btn-sm btn-secondary" onClick={clearSession}>
-                            Logout
-                        </NavLink>
-                        <div className="header-avatar">{userName.charAt(0).toUpperCase()}</div>
+                        <div
+                            className="header-avatar"
+                            style={{ background: meta.accent }}
+                            title={userName}
+                        >
+                            {userName.charAt(0).toUpperCase()}
+                        </div>
                     </div>
                 </header>
                 <main className="page-content fade-in">

@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,5 +12,6 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-secret-key")
-    JWT_ACCESS_TOKEN_EXPIRES = False  # Tokens don't expire (adjust for production)
+    # Tokens expire after 24 hours for security
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
     DEBUG = os.getenv("FLASK_DEBUG", "True") == "True"

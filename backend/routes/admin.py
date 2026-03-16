@@ -7,25 +7,10 @@ from models.course import Course
 from models.reservation import Reservation
 from models.payment import Payment
 from models.enrollment import Enrollment
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from functools import wraps
+from flask_jwt_extended import get_jwt_identity
+from utils.decorators import admin_required
 
 admin_bp = Blueprint("admin", __name__)
-
-
-# ─────────────────────────────────────────────
-# Helper: Admin-only decorator
-# ─────────────────────────────────────────────
-def admin_required(fn):
-    """Decorator that restricts an endpoint to admin users only."""
-    @wraps(fn)
-    @jwt_required()
-    def wrapper(*args, **kwargs):
-        identity = get_jwt_identity()
-        if identity.get("role") != "admin":
-            return jsonify({"error": "Access denied: Admins only"}), 403
-        return fn(*args, **kwargs)
-    return wrapper
 
 
 # ─────────────────────────────────────────────
@@ -35,7 +20,7 @@ def admin_required(fn):
 @admin_required
 def get_all_users():
     """GET /admin/users — List all registered users with optional role filter."""
-    role = request.args.get("role")  # ?role=student|instructor|admin
+    role = request.args.get("role")
     query = User.query
     if role:
         query = query.filter_by(role=role.lower())
@@ -54,7 +39,6 @@ def get_user(user_id):
     if not user:
         return jsonify({"error": "User not found"}), 404
     data = user.to_dict()
-    # Enrich with profile details
     if user.role == "student" and user.student:
         data["phone"] = user.student.phone
     elif user.role == "instructor" and user.instructor:
@@ -83,7 +67,6 @@ def change_user_role(user_id):
     """
     PATCH /admin/users/<id>/role — Change a user's role.
     Body: { role: 'student' | 'instructor' | 'admin' }
-    Warning: This updates the role only; existing profile data is preserved.
     """
     data = request.get_json() or {}
     new_role = data.get("role", "").lower()
@@ -135,7 +118,7 @@ def delete_course(course_id):
 @admin_required
 def get_all_reservations():
     """GET /admin/reservations — List all reservations with optional status filter."""
-    status = request.args.get("status")  # ?status=pending|confirmed|cancelled
+    status = request.args.get("status")
     query = Reservation.query
     if status:
         query = query.filter_by(status=status.lower())
@@ -166,7 +149,6 @@ def update_reservation_status(reservation_id):
         reservation.confirm()
     elif new_status == "cancelled":
         reservation.cancel()
-        # Release the seat back when cancelled
         reservation.course.release_seat()
     else:
         reservation.status = new_status

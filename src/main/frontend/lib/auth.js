@@ -6,17 +6,12 @@ export function setSession({ accessToken, user }) {
         user,
         role: user?.role?.toLowerCase() || "student",
     };
-
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    localStorage.setItem("userRole", session.role.toUpperCase());
 }
 
 export function getSession() {
     const value = localStorage.getItem(STORAGE_KEY);
-    if (!value) {
-        return null;
-    }
-
+    if (!value) return null;
     try {
         return JSON.parse(value);
     } catch {
@@ -27,7 +22,6 @@ export function getSession() {
 
 export function clearSession() {
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem("userRole");
 }
 
 export function getToken() {
@@ -38,6 +32,15 @@ export function getRole() {
     return getSession()?.role || "";
 }
 
+export function getUser() {
+    return getSession()?.user || null;
+}
+
 export function isAuthenticated() {
     return Boolean(getToken());
+}
+
+/** Returns true only if the current session role matches one of the given roles */
+export function hasRole(...roles) {
+    return roles.includes(getRole());
 }

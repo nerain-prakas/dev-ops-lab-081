@@ -4,28 +4,21 @@ from models.reservation import Reservation
 from models.course import Course
 from models.student import Student
 from datetime import date
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
+from utils.decorators import role_required
 
 reservations_bp = Blueprint("reservations", __name__)
 
 
 @reservations_bp.route("/reserve", methods=["POST"])
-@jwt_required()
+@role_required("student")
 def reserve_course():
     """
     POST /reserve
     Student only — reserve a seat in a course.
     Body: { course_id }
-
-    Business logic:
-    - Verify student role and profile.
-    - Check course exists and has available seats.
-    - Call course.reserve_seat() to decrement available_seats.
-    - Create a Reservation with status 'pending'.
     """
     identity = get_jwt_identity()
-    if identity.get("role") != "student":
-        return jsonify({"error": "Access denied: Students only"}), 403
 
     student = Student.query.filter_by(user_id=identity["user_id"]).first()
     if not student:
@@ -48,7 +41,6 @@ def reserve_course():
     if existing:
         return jsonify({"error": "You already have an active reservation for this course"}), 409
 
-    # Attempt to reserve a seat (OOP method on Course)
     if not course.reserve_seat():
         return jsonify({"error": "No available seats in this course"}), 400
 
@@ -68,15 +60,13 @@ def reserve_course():
 
 
 @reservations_bp.route("/reservations", methods=["GET"])
-@jwt_required()
+@role_required("student")
 def get_reservations():
     """
     GET /reservations
-    Returns all reservations for the currently logged-in student.
+    Student only — returns all reservations for the currently logged-in student.
     """
     identity = get_jwt_identity()
-    if identity.get("role") != "student":
-        return jsonify({"error": "Access denied: Students only"}), 403
 
     student = Student.query.filter_by(user_id=identity["user_id"]).first()
     if not student:
