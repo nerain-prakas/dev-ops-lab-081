@@ -9,13 +9,18 @@ import CourseDetail from './pages/CourseDetail';
 import Enrollments from './pages/Enrollments';
 import Reservations from './pages/Reservations';
 import Payments from './pages/Payments';
+import { isAuthenticated } from './lib/auth';
+
+function RequireAuth({ children }) {
+    return isAuthenticated() ? children : <Navigate to="/login" replace />;
+}
 
 function App() {
     return (
         <Router>
             <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/" element={<Layout />}>
+                <Route path="/login" element={isAuthenticated() ? <Navigate to="/" replace /> : <Login />} />
+                <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
                     <Route index element={<Dashboard />} />
                     <Route path="users" element={<Users />} />
                     <Route path="courses" element={<Courses />} />

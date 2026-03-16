@@ -1,23 +1,42 @@
-import React, { useState } from 'react';
-import { mockUsers } from '../data/mockData';
+import React, { useEffect, useState } from 'react';
+import { apiRequest } from '../lib/api';
+import { getRole, getToken } from '../lib/auth';
 
 export default function Users() {
-    const [users, setUsers] = useState(mockUsers);
+    const token = getToken();
+    const role = getRole();
+    const [users, setUsers] = useState([]);
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
-    const [form, setForm] = useState({ name: '', email: '', role: 'STUDENT', password: '' });
+    const [form, setForm] = useState({ name: '', email: '', role: 'student', password: '' });
+    const [error, setError] = useState('');
 
-    const filtered = users.filter(
-        (u) =>
-            u.name.toLowerCase().includes(search.toLowerCase()) ||
-            u.email.toLowerCase().includes(search.toLowerCase()) ||
-            u.role.toLowerCase().includes(search.toLowerCase())
+    async function loadUsers() {
+        try {
+            setError('');
+            const data = await apiRequest('/admin/users', { token });
+            setUsers(data.users || []);
+        } catch (err) {
+            setError(err.message);
+        }
+    }
+
+    useEffect(() => {
+        if (role === 'admin') {
+            loadUsers();
+        }
+    }, [role, token]);
+
+    const filtered = users.filter((user) =>
+        user.name.toLowerCase().includes(search.toLowerCase()) ||
+        user.email.toLowerCase().includes(search.toLowerCase()) ||
+        user.role.toLowerCase().includes(search.toLowerCase())
     );
 
     const openAdd = () => {
         setEditingUser(null);
-        setForm({ name: '', email: '', role: 'STUDENT', password: '' });
+        setForm({ name: '', email: '', role: 'student', password: '' });
         setShowModal(true);
     };
 
@@ -27,48 +46,71 @@ export default function Users() {
         setShowModal(true);
     };
 
-    const handleSave = (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
-        if (editingUser) {
-            setUsers(users.map((u) => (u.userId === editingUser.userId ? { ...u, ...form } : u)));
-        } else {
-            const newUser = { ...form, userId: Date.now() };
-            setUsers([...users, newUser]);
+        try {
+            if (editingUser) {
+                await apiRequest(`/admin/users/${editingUser.user_id}/role`, {
+                    method: 'PATCH',
+                    token,
+                    data: { role: form.role },
+                });
+            } else {
+                await apiRequest('/register', {
+                    method: 'POST',
+                    data: {
+                        name: form.name,
+                        email: form.email,
+                        password: form.password,
+                        role: form.role,
+                    },
+                });
+            }
+            setShowModal(false);
+            loadUsers();
+        } catch (err) {
+            setError(err.message);
         }
-        setShowModal(false);
     };
 
-    const handleDelete = (userId) => {
-        if (confirm('Are you sure you want to delete this user?')) {
-            setUsers(users.filter((u) => u.userId !== userId));
+    const handleDelete = async (userId) => {
+        if (!window.confirm('Are you sure you want to delete this user?')) {
+            return;
+        }
+
+        try {
+            await apiRequest(`/admin/users/${userId}`, {
+                method: 'DELETE',
+                token,
+            });
+            loadUsers();
+        } catch (err) {
+            setError(err.message);
         }
     };
 
-    const roleBadge = (role) => {
-        const map = { STUDENT: 'info', INSTRUCTOR: 'purple', ADMIN: 'warning' };
-        return <span className={`badge ${map[role] || 'info'}`}>{role}</span>;
-    };
+    if (role !== 'admin') {
+        return <div className="card slide-up">This page is available to admins only.</div>;
+    }
 
     return (
         <div className="slide-up">
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Users</h1>
-                    <p className="page-subtitle">Manage students, instructors & administrators</p>
+                    <p className="page-subtitle">Manage students, instructors and administrators</p>
                 </div>
-                <button className="btn btn-primary" onClick={openAdd}>+ Add User</button>
+                <button className="btn btn-primary" onClick={openAdd}>Add User</button>
             </div>
+
+            {error && <div className="card" style={{ marginBottom: '20px' }}>{error}</div>}
 
             <div className="table-wrapper">
                 <div className="table-header">
                     <h3 className="table-title">All Users ({filtered.length})</h3>
                     <div className="table-search">
-                        <span>🔍</span>
-                        <input
-                            placeholder="Search users..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+                        <span>S</span>
+                        <input placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                 </div>
                 <table>
@@ -83,70 +125,67 @@ export default function Users() {
                     </thead>
                     <tbody>
                         {filtered.map((user) => (
-                            <tr key={user.userId}>
-                                <td>#{user.userId}</td>
-                                <td style={{ fontWeight: 600 }}>{user.name}</td>
-                                <td style={{ color: 'var(--text-secondary)' }}>{user.email}</td>
-                                <td>{roleBadge(user.role)}</td>
+                            <tr key={user.user_id}>
+                                <td>#{user.user_id}</td>
+                                <td>{user.name}</td>
+                                <td>{user.email}</td>
+                                <td><span className="badge info">{String(user.role || '').toUpperCase()}</span></td>
                                 <td>
                                     <div className="action-buttons">
-                                        <button className="btn btn-sm btn-secondary" onClick={() => openEdit(user)}>✏️ Edit</button>
-                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(user.userId)}>🗑️</button>
+                                        <button className="btn btn-sm btn-secondary" onClick={() => openEdit(user)}>Edit Role</button>
+                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(user.user_id)}>Delete</button>
                                     </div>
                                 </td>
                             </tr>
                         ))}
                         {filtered.length === 0 && (
                             <tr>
-                                <td colSpan="5">
-                                    <div className="empty-state">
-                                        <div className="empty-state-icon">👥</div>
-                                        <div className="empty-state-title">No users found</div>
-                                        <div className="empty-state-desc">Try adjusting your search or add a new user.</div>
-                                    </div>
-                                </td>
+                                <td colSpan="5">No users found.</td>
                             </tr>
                         )}
                     </tbody>
                 </table>
             </div>
 
-            {/* Modal */}
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3 className="modal-title">{editingUser ? 'Edit User' : 'Add New User'}</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+                            <h3 className="modal-title">{editingUser ? 'Edit User Role' : 'Add New User'}</h3>
+                            <button className="modal-close" onClick={() => setShowModal(false)}>x</button>
                         </div>
                         <form onSubmit={handleSave}>
                             <div className="modal-body">
+                                {!editingUser && (
+                                    <>
+                                        <div className="form-group">
+                                            <label className="form-label">Full Name</label>
+                                            <input className="form-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Email</label>
+                                            <input className="form-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+                                        </div>
+                                    </>
+                                )}
                                 <div className="form-group">
-                                    <label className="form-label">Full Name</label>
-                                    <input className="form-input" placeholder="John Doe" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                                    <label className="form-label">Role</label>
+                                    <select className="form-select" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                                        <option value="student">Student</option>
+                                        <option value="instructor">Instructor</option>
+                                        {editingUser && <option value="admin">Administrator</option>}
+                                    </select>
                                 </div>
-                                <div className="form-row">
+                                {!editingUser && (
                                     <div className="form-group">
-                                        <label className="form-label">Email</label>
-                                        <input className="form-input" type="email" placeholder="john@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+                                        <label className="form-label">Password</label>
+                                        <input className="form-input" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
                                     </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Role</label>
-                                        <select className="form-select" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                                            <option value="STUDENT">Student</option>
-                                            <option value="INSTRUCTOR">Instructor</option>
-                                            <option value="ADMIN">Administrator</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Password {editingUser && '(leave blank to keep current)'}</label>
-                                    <input className="form-input" type="password" placeholder="••••••••" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!editingUser} />
-                                </div>
+                                )}
                             </div>
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">{editingUser ? 'Save Changes' : 'Add User'}</button>
+                                <button type="submit" className="btn btn-primary">{editingUser ? 'Save Role' : 'Create User'}</button>
                             </div>
                         </form>
                     </div>

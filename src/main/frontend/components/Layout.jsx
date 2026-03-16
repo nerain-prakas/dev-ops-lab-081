@@ -1,29 +1,33 @@
 import React from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { clearSession, getSession } from '../lib/auth';
 
 const navItems = [
     {
         section: 'Main', items: [
-            { to: '/', icon: '📊', label: 'Dashboard' },
+            { to: '/', icon: 'D', label: 'Dashboard' },
         ]
     },
     {
         section: 'Management', items: [
-            { to: '/users', icon: '👥', label: 'Users' },
-            { to: '/courses', icon: '📚', label: 'Courses' },
-            { to: '/enrollments', icon: '📝', label: 'Enrollments' },
+            { to: '/users', icon: 'U', label: 'Users' },
+            { to: '/courses', icon: 'C', label: 'Courses' },
+            { to: '/enrollments', icon: 'E', label: 'Enrollments' },
         ]
     },
     {
         section: 'Operations', items: [
-            { to: '/reservations', icon: '🎫', label: 'Reservations' },
-            { to: '/payments', icon: '💳', label: 'Payments' },
+            { to: '/reservations', icon: 'R', label: 'Reservations' },
+            { to: '/payments', icon: 'P', label: 'Payments' },
         ]
     },
 ];
 
 export default function Layout() {
     const location = useLocation();
+    const session = getSession();
+    const userRole = session?.role || 'admin';
+    const userName = session?.user?.name || 'User';
 
     const getPageTitle = () => {
         const path = location.pathname;
@@ -32,32 +36,28 @@ export default function Layout() {
         return segment.charAt(0).toUpperCase() + segment.slice(1);
     };
 
-    const userRole = localStorage.getItem('userRole') || 'ADMIN';
-
-    // Filter nav items conditionally based on role
     const filteredNavItems = navItems.map(section => {
         let items = section.items;
-        
-        if (userRole === 'STUDENT') {
+
+        if (userRole === 'student') {
             const allowed = ['/', '/courses', '/enrollments', '/reservations', '/payments'];
             items = items.filter(item => allowed.includes(item.to));
-        } else if (userRole === 'INSTRUCTOR') {
+        } else if (userRole === 'instructor') {
             const allowed = ['/', '/courses', '/enrollments'];
             items = items.filter(item => allowed.includes(item.to));
         }
-        
+
         return { ...section, items };
     }).filter(section => section.items.length > 0);
 
     return (
         <div className="app-layout">
-            {/* Sidebar */}
             <aside className="sidebar">
                 <div className="sidebar-logo">
                     <div className="sidebar-logo-icon">C</div>
                     <div className="sidebar-logo-text">
                         CourseHub
-                        <span>{userRole === 'STUDENT' ? 'Student Portal' : userRole === 'INSTRUCTOR' ? 'Instructor Portal' : 'Admin Panel'}</span>
+                        <span>{userRole === 'student' ? 'Student Portal' : userRole === 'instructor' ? 'Instructor Portal' : 'Admin Panel'}</span>
                     </div>
                 </div>
                 <nav className="sidebar-nav">
@@ -80,16 +80,15 @@ export default function Layout() {
                 </nav>
             </aside>
 
-            {/* Main content */}
             <div className="main-area">
                 <header className="header">
                     <h2 className="header-title">{getPageTitle()}</h2>
                     <div className="header-actions">
-                        <span className="badge" style={{marginRight: '15px'}}>{userRole}</span>
-                        <NavLink to="/login" className="btn btn-sm btn-secondary" onClick={() => localStorage.removeItem('userRole')}>
-                            {userRole !== 'ADMIN' ? '🔄 Switch Role' : '🔐 Logout'}
+                        <span className="badge" style={{ marginRight: '15px' }}>{userRole.toUpperCase()}</span>
+                        <NavLink to="/login" className="btn btn-sm btn-secondary" onClick={clearSession}>
+                            Logout
                         </NavLink>
-                        <div className="header-avatar">{userRole.charAt(0)}</div>
+                        <div className="header-avatar">{userName.charAt(0).toUpperCase()}</div>
                     </div>
                 </header>
                 <main className="page-content fade-in">

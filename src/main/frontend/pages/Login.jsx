@@ -1,16 +1,38 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiRequest } from '../lib/api';
+import { setSession } from '../lib/auth';
 
 export default function Login() {
     const navigate = useNavigate();
-    const [form, setForm] = useState({ email: '', password: '', role: 'STUDENT' });
+    const [form, setForm] = useState({ email: '', password: '', role: 'student' });
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // TODO: Replace with actual API call to POST /api/users/login
-        // Save mock role to localStorage for demo
-        localStorage.setItem('userRole', form.role);
-        navigate('/');
+        setError('');
+        setLoading(true);
+
+        try {
+            const result = await apiRequest('/login', {
+                method: 'POST',
+                data: {
+                    email: form.email,
+                    password: form.password,
+                },
+            });
+
+            setSession({
+                accessToken: result.access_token,
+                user: result.user,
+            });
+            navigate('/');
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -21,6 +43,12 @@ export default function Login() {
                 </div>
                 <h1 className="login-title">Welcome Back</h1>
                 <p className="login-subtitle">Sign in to CourseHub Management</p>
+
+                {error && (
+                    <div className="badge danger" style={{ display: 'block', marginBottom: '16px', textAlign: 'center' }}>
+                        {error}
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
@@ -39,31 +67,30 @@ export default function Login() {
                         <input
                             type="password"
                             className="form-input"
-                            placeholder="••••••••"
                             value={form.password}
                             onChange={(e) => setForm({ ...form, password: e.target.value })}
                             required
                         />
                     </div>
                     <div className="form-group">
-                        <label className="form-label">Login As</label>
-                        <select 
-                            className="form-input" 
-                            value={form.role} 
-                            onChange={(e) => setForm({...form, role: e.target.value})}
+                        <label className="form-label">Portal</label>
+                        <select
+                            className="form-input"
+                            value={form.role}
+                            onChange={(e) => setForm({ ...form, role: e.target.value })}
                         >
-                            <option value="STUDENT">Student</option>
-                            <option value="INSTRUCTOR">Instructor</option>
-                            <option value="ADMIN">Admin</option>
+                            <option value="student">Student</option>
+                            <option value="instructor">Instructor</option>
+                            <option value="admin">Admin</option>
                         </select>
                     </div>
-                    <button type="submit" className="btn btn-primary login-btn">
-                        Sign In →
+                    <button type="submit" className="btn btn-primary login-btn" disabled={loading}>
+                        {loading ? 'Signing In...' : 'Sign In'}
                     </button>
                 </form>
 
                 <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                    Demo — any credentials will sign in
+                    Use an account from the deployed backend.
                 </p>
             </div>
         </div>

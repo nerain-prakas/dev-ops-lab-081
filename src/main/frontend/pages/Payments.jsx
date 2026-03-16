@@ -1,43 +1,92 @@
-import React, { useState } from 'react';
-import { mockPayments, mockCourses, mockUsers } from '../data/mockData';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { apiRequest } from '../lib/api';
+import { getRole, getToken } from '../lib/auth';
 
 export default function Payments() {
-    const [payments, setPayments] = useState(mockPayments);
+    const location = useLocation();
+    const navigate = useNavigate();
+    const token = getToken();
+    const role = getRole();
+    const [payments, setPayments] = useState([]);
+    const [reservations, setReservations] = useState([]);
+    const [courses, setCourses] = useState([]);
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
-    const [form, setForm] = useState({ courseName: '', studentName: '', amount: '' });
-    const userRole = localStorage.getItem('userRole') || 'ADMIN';
-    const navigate = useNavigate();
+    const [form, setForm] = useState({ reservation_id: '', amount: '', payment_type: 'credit_card' });
+    const [error, setError] = useState('');
 
-    const students = mockUsers.filter((u) => u.role === 'STUDENT');
+    async function loadPayments() {
+        try {
+            setError('');
+            const paymentsEndpoint = role === 'admin' ? '/admin/payments' : '/payments';
+            const [paymentsData, coursesData] = await Promise.all([
+                apiRequest(paymentsEndpoint, { token }),
+                apiRequest('/courses', { token }),
+            ]);
+            setPayments(paymentsData.payments || []);
+            setCourses(coursesData.courses || []);
 
-    const filtered = payments.filter(
-        (p) =>
-            p.studentName.toLowerCase().includes(search.toLowerCase()) ||
-            p.courseName.toLowerCase().includes(search.toLowerCase()) ||
-            p.transactionStatus.toLowerCase().includes(search.toLowerCase())
+            if (role === 'student') {
+                const reservationsData = await apiRequest('/reservations', { token });
+                const pendingReservations = (reservationsData.reservations || []).filter((item) => item.status === 'pending');
+                setReservations(pendingReservations);
+
+                const queryReservationId = new URLSearchParams(location.search).get('reservationId');
+                const selectedReservation = pendingReservations.find((item) => String(item.reservation_id) === queryReservationId) || pendingReservations[0];
+                if (selectedReservation) {
+                    const course = coursesData.courses.find((item) => item.course_id === selectedReservation.course_id);
+                    setForm({
+                        reservation_id: String(selectedReservation.reservation_id),
+                        amount: course ? String(course.price) : '',
+                        payment_type: 'credit_card',
+                    });
+                }
+            }
+        } catch (err) {
+            setError(err.message);
+        }
+    }
+
+    useEffect(() => {
+        loadPayments();
+    }, [location.search, role, token]);
+
+    const filtered = payments.filter((item) =>
+        String(item.payment_type || '').toLowerCase().includes(search.toLowerCase()) ||
+        String(item.payment_date || '').toLowerCase().includes(search.toLowerCase()) ||
+        String(item.amount || '').toLowerCase().includes(search.toLowerCase())
     );
 
-    const totalRevenue = payments.filter((p) => p.transactionStatus === 'SUCCESS').reduce((s, p) => s + p.amount, 0);
+    const totalRevenue = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-    const handleProcess = (e) => {
+    const handleReservationChange = (reservationId) => {
+        const selectedReservation = reservations.find((item) => String(item.reservation_id) === reservationId);
+        const course = courses.find((item) => item.course_id === selectedReservation?.course_id);
+        setForm({
+            reservation_id: reservationId,
+            amount: course ? String(course.price) : '',
+            payment_type: form.payment_type,
+        });
+    };
+
+    const handleProcess = async (e) => {
         e.preventDefault();
-        const newPayment = {
-            paymentId: Date.now(),
-            courseName: form.courseName,
-            studentName: form.studentName,
-            amount: parseFloat(form.amount),
-            paymentDate: new Date().toISOString().split('T')[0],
-            transactionStatus: 'SUCCESS',
-        };
-        setPayments([newPayment, ...payments]);
-        setShowModal(false);
-        setForm({ courseName: '', studentName: '', amount: '' });
-
-        if (userRole === 'STUDENT') {
-            alert('Payment Successful! You are now enrolled in the course.');
+        try {
+            await apiRequest('/payment', {
+                method: 'POST',
+                token,
+                data: {
+                    reservation_id: Number(form.reservation_id),
+                    amount: Number(form.amount),
+                    payment_type: form.payment_type,
+                },
+            });
+            setShowModal(false);
+            loadPayments();
             navigate('/enrollments');
+        } catch (err) {
+            setError(err.message);
         }
     };
 
@@ -46,37 +95,26 @@ export default function Payments() {
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Payments</h1>
-                    <p className="page-subtitle">{userRole === 'STUDENT' ? 'Make and track your course payments' : 'Track and process course payments'}</p>
+                    <p className="page-subtitle">{role === 'student' ? 'Make and track your course payments' : 'Track course payments'}</p>
                 </div>
-                {userRole === 'STUDENT' ? (
-                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>💳 Make Payment</button>
-                ) : (
-                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Process Payment</button>
+                {role === 'student' && reservations.length > 0 && (
+                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>Make Payment</button>
                 )}
             </div>
 
-            {/* Revenue Stats */}
-            {userRole === 'ADMIN' && (
+            {error && <div className="card" style={{ marginBottom: '20px' }}>{error}</div>}
+
+            {role === 'admin' && (
                 <div className="stats-grid" style={{ marginBottom: '24px' }}>
                     <div className="stat-card emerald">
-                        <div className="stat-icon emerald">💰</div>
-                        <div className="stat-value">₹{totalRevenue.toLocaleString()}</div>
+                        <div className="stat-icon emerald">R</div>
+                        <div className="stat-value">Rs {totalRevenue.toFixed(2)}</div>
                         <div className="stat-label">Total Revenue</div>
                     </div>
                     <div className="stat-card blue">
-                        <div className="stat-icon blue">✅</div>
-                        <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'SUCCESS').length}</div>
-                        <div className="stat-label">Successful</div>
-                    </div>
-                    <div className="stat-card amber">
-                        <div className="stat-icon amber">⏳</div>
-                        <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'PENDING').length}</div>
-                        <div className="stat-label">Pending</div>
-                    </div>
-                    <div className="stat-card rose">
-                        <div className="stat-icon rose">❌</div>
-                        <div className="stat-value">{payments.filter((p) => p.transactionStatus === 'FAILED').length}</div>
-                        <div className="stat-label">Failed</div>
+                        <div className="stat-icon blue">P</div>
+                        <div className="stat-value">{payments.length}</div>
+                        <div className="stat-label">Payments</div>
                     </div>
                 </div>
             )}
@@ -85,7 +123,7 @@ export default function Payments() {
                 <div className="table-header">
                     <h3 className="table-title">Transaction History ({filtered.length})</h3>
                     <div className="table-search">
-                        <span>🔍</span>
+                        <span>S</span>
                         <input placeholder="Search payments..." value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                 </div>
@@ -93,84 +131,67 @@ export default function Payments() {
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Student</th>
-                            <th>Course</th>
+                            <th>Reservation</th>
                             <th>Amount</th>
                             <th>Date</th>
-                            <th>Status</th>
+                            <th>Type</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filtered.map((payment) => (
-                            <tr key={payment.paymentId}>
-                                <td>#{payment.paymentId}</td>
-                                <td style={{ fontWeight: 600 }}>{payment.studentName}</td>
-                                <td>{payment.courseName}</td>
-                                <td style={{ fontWeight: 600 }}>₹{payment.amount.toLocaleString()}</td>
-                                <td style={{ color: 'var(--text-secondary)' }}>{payment.paymentDate}</td>
-                                <td>
-                                    <span className={`badge ${payment.transactionStatus === 'SUCCESS' ? 'success' : payment.transactionStatus === 'PENDING' ? 'warning' : 'danger'}`}>
-                                        {payment.transactionStatus}
-                                    </span>
-                                </td>
+                            <tr key={payment.payment_id}>
+                                <td>#{payment.payment_id}</td>
+                                <td>#{payment.reservation_id}</td>
+                                <td>Rs {Number(payment.amount || 0).toFixed(2)}</td>
+                                <td>{payment.payment_date}</td>
+                                <td>{payment.payment_type}</td>
                             </tr>
                         ))}
                         {filtered.length === 0 && (
                             <tr>
-                                <td colSpan="6">
-                                    <div className="empty-state">
-                                        <div className="empty-state-icon">💳</div>
-                                        <div className="empty-state-title">No payments found</div>
-                                        <div className="empty-state-desc">Try adjusting your search or process a new payment.</div>
-                                    </div>
-                                </td>
+                                <td colSpan="5">No payments found.</td>
                             </tr>
                         )}
                     </tbody>
                 </table>
             </div>
 
-            {/* Modal */}
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title">Process Payment</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+                            <button className="modal-close" onClick={() => setShowModal(false)}>x</button>
                         </div>
                         <form onSubmit={handleProcess}>
                             <div className="modal-body">
                                 <div className="form-group">
-                                    <label className="form-label">Student</label>
-                                    <select className="form-select" value={form.studentName} onChange={(e) => setForm({ ...form, studentName: e.target.value })} required>
-                                        <option value="">Select a student</option>
-                                        {students.map((s) => (
-                                            <option key={s.userId} value={s.name}>{s.name}</option>
+                                    <label className="form-label">Reservation</label>
+                                    <select className="form-select" value={form.reservation_id} onChange={(e) => handleReservationChange(e.target.value)} required>
+                                        <option value="">Select a reservation</option>
+                                        {reservations.map((item) => (
+                                            <option key={item.reservation_id} value={item.reservation_id}>{item.course_title}</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label className="form-label">Course</label>
-                                        <select className="form-select" value={form.courseName} onChange={(e) => {
-                                            const course = mockCourses.find((c) => c.title === e.target.value);
-                                            setForm({ ...form, courseName: e.target.value, amount: course ? course.fee : '' });
-                                        }} required>
-                                            <option value="">Select a course</option>
-                                            {mockCourses.map((c) => (
-                                                <option key={c.courseId} value={c.title}>{c.title}</option>
-                                            ))}
-                                        </select>
+                                        <label className="form-label">Amount</label>
+                                        <input className="form-input" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">Amount (₹)</label>
-                                        <input className="form-input" type="number" placeholder="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+                                        <label className="form-label">Payment Type</label>
+                                        <select className="form-select" value={form.payment_type} onChange={(e) => setForm({ ...form, payment_type: e.target.value })}>
+                                            <option value="credit_card">Credit Card</option>
+                                            <option value="upi">UPI</option>
+                                            <option value="cash">Cash</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">Process Payment</button>
+                                <button type="submit" className="btn btn-primary">Submit Payment</button>
                             </div>
                         </form>
                     </div>
