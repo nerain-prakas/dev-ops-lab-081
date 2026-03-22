@@ -72,6 +72,21 @@ def create_app() -> Flask:
             "message": "Online Course Reservation System API is running"
         }), 200
 
+    @app.route("/health", methods=["GET"])
+    def health_plain():
+        return jsonify({
+            "status": "ok",
+            "message": "Online Course Reservation System API is running"
+        }), 200
+
+    @app.route("/", methods=["GET"])
+    def root():
+        return jsonify({
+            "service": "online-course-api",
+            "status": "ok",
+            "docs": "/api/health"
+        }), 200
+
     return app
 
 
