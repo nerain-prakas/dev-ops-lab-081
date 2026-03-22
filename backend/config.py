@@ -6,10 +6,16 @@ load_dotenv()
 
 class Config:
     """Base configuration class."""
-    SQLALCHEMY_DATABASE_URI = os.getenv(
+    _db_url = os.getenv(
         "DATABASE_URL",
         "postgresql://postgres:password@localhost:5432/course_reservation_db"
     )
+
+    # Supabase Postgres commonly requires SSL from hosted environments.
+    if _db_url.startswith("postgresql://") and "sslmode=" not in _db_url:
+        _db_url = f"{_db_url}{'&' if '?' in _db_url else '?'}sslmode=require"
+
+    SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-secret-key")
     # Keep compatibility with dict identities used in create_access_token().
