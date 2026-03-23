@@ -4,9 +4,7 @@ from models.student import Student
 from models.instructor import Instructor
 from flask_jwt_extended import get_jwt_identity, get_jwt
 from utils.decorators import role_required
-from demo_data import (
-    DEMO_ENROLLMENTS_STUDENT, DEMO_ENROLLMENTS_INSTRUCTOR, is_demo_identity
-)
+from demo_data import DEMO_ENROLLMENTS_STUDENT, DEMO_ENROLLMENTS_INSTRUCTOR, is_demo
 
 enrollments_bp = Blueprint("enrollments", __name__)
 
@@ -16,25 +14,18 @@ enrollments_bp = Blueprint("enrollments", __name__)
 def get_enrollments():
     """
     GET /enrollments
-    - Student: their own enrollments
-    - Instructor: enrollments for their courses
+    - Student  → their own enrollments
+    - Instructor → enrollments for their courses
     """
-    user_id = int(get_jwt_identity())
-    claims  = get_jwt()
-    role    = claims.get("role")
+    if is_demo():
+        claims = get_jwt()
+        role   = claims.get("role", "")
+        data   = DEMO_ENROLLMENTS_STUDENT if role == "student" else DEMO_ENROLLMENTS_INSTRUCTOR
+        return jsonify({"total": len(data), "enrollments": data}), 200
 
-    # Demo accounts
-    if is_demo_identity({"user_id": user_id}):
-        if role == "student":
-            return jsonify({
-                "total": len(DEMO_ENROLLMENTS_STUDENT),
-                "enrollments": DEMO_ENROLLMENTS_STUDENT
-            }), 200
-        else:  # instructor
-            return jsonify({
-                "total": len(DEMO_ENROLLMENTS_INSTRUCTOR),
-                "enrollments": DEMO_ENROLLMENTS_INSTRUCTOR
-            }), 200
+    user_id = get_jwt_identity()      # string
+    claims  = get_jwt()
+    role    = claims.get("role", "")
 
     try:
         if role == "student":
@@ -49,10 +40,7 @@ def get_enrollments():
             course_ids  = [c.course_id for c in instructor.courses]
             enrollments = Enrollment.query.filter(Enrollment.course_id.in_(course_ids)).all()
 
-        return jsonify({
-            "total":       len(enrollments),
-            "enrollments": [e.to_dict() for e in enrollments]
-        }), 200
+        return jsonify({"total": len(enrollments), "enrollments": [e.to_dict() for e in enrollments]}), 200
     except Exception:
         data = DEMO_ENROLLMENTS_STUDENT if role == "student" else DEMO_ENROLLMENTS_INSTRUCTOR
         return jsonify({"total": len(data), "enrollments": data}), 200

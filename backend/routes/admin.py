@@ -12,7 +12,7 @@ from utils.decorators import admin_required
 from demo_data import (
     DEMO_USERS_ADMIN, DEMO_COURSES, DEMO_ENROLLMENTS_ADMIN,
     DEMO_RESERVATIONS_ADMIN, DEMO_PAYMENTS_ADMIN,
-    DEMO_DASHBOARD_SUMMARY, is_demo_identity
+    DEMO_DASHBOARD_SUMMARY, is_demo
 )
 
 admin_bp = Blueprint("admin", __name__)
@@ -20,7 +20,7 @@ admin_bp = Blueprint("admin", __name__)
 
 def _is_demo():
     """Helper: returns True if the current JWT is a demo account."""
-    return is_demo_identity({"user_id": int(get_jwt_identity())})
+    return is_demo()
 
 
 # ─────────────────────────────────────────────
@@ -97,11 +97,11 @@ def delete_user(user_id):
     if _is_demo():
         return jsonify({"message": "Demo mode: user deletion simulated!"}), 200
     try:
-        current_user_id = int(get_jwt_identity())
+        current_user_id = str(get_jwt_identity())
         user = User.query.get(user_id)
         if not user:
             return jsonify({"error": "User not found"}), 404
-        if user.user_id == current_user_id:
+        if str(user.user_id) == current_user_id:
             return jsonify({"error": "You cannot delete your own account"}), 400
         db.session.delete(user)
         db.session.commit()
