@@ -4,7 +4,7 @@ from models.payment import Payment
 from models.reservation import Reservation
 from models.enrollment import Enrollment
 from datetime import date
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, get_jwt
 from utils.decorators import role_required
 from demo_data import DEMO_PAYMENTS_STUDENT, is_demo_identity
 
@@ -15,8 +15,8 @@ payments_bp = Blueprint("payments", __name__)
 @role_required("student")
 def make_payment():
     """POST /payment — Student only."""
-    identity = get_jwt_identity()
-    if is_demo_identity(identity):
+    user_id = int(get_jwt_identity())
+    if is_demo_identity({"user_id": user_id}):
         data = request.get_json() or {}
         return jsonify({
             "message": "Demo mode: payment processed successfully!",
@@ -36,7 +36,7 @@ def make_payment():
             }
         }), 201
     try:
-        identity = get_jwt_identity()
+        claims = get_jwt()
         data = request.get_json()
         if not data:
             return jsonify({"error": "No input data provided"}), 400
@@ -47,8 +47,10 @@ def make_payment():
         reservation = Reservation.query.get(data["reservation_id"])
         if not reservation:
             return jsonify({"error": "Reservation not found"}), 404
-        student_id = identity.get("student_id")
-        if reservation.student_id != student_id:
+        # Verify via DB lookup rather than JWT claim (more reliable)
+        from models.student import Student
+        student = Student.query.filter_by(user_id=user_id).first()
+        if not student or reservation.student_id != student.student_id:
             return jsonify({"error": "Access denied"}), 403
         if reservation.status != "pending":
             return jsonify({"error": f"Cannot pay for a {reservation.status} reservation"}), 400
@@ -81,15 +83,18 @@ def make_payment():
 @role_required("student")
 def get_payments():
     """GET /payments — Student only."""
-    identity = get_jwt_identity()
-    if is_demo_identity(identity):
+    user_id = int(get_jwt_identity())
+    if is_demo_identity({"user_id": user_id}):
         return jsonify({
             "total": len(DEMO_PAYMENTS_STUDENT),
             "payments": DEMO_PAYMENTS_STUDENT
         }), 200
     try:
-        student_id = identity.get("student_id")
-        reservations = Reservation.query.filter_by(student_id=student_id).all()
+        from models.student import Student
+        student = Student.query.filter_by(user_id=user_id).first()
+        if not student:
+            return jsonify({"total": 0, "payments": []}), 200
+        reservations = Reservation.query.filter_by(student_id=student.student_id).all()
         reservation_ids = [r.reservation_id for r in reservations]
         payments = Payment.query.filter(Payment.reservation_id.in_(reservation_ids)).all()
         return jsonify({"total": len(payments), "payments": [p.to_dict() for p in payments]}), 200

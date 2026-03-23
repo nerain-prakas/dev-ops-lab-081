@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from database.db import db
 from models.course import Course
 from models.instructor import Instructor
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, get_jwt
 from utils.decorators import role_required
 from demo_data import (
     DEMO_COURSES, is_demo_identity
@@ -36,12 +36,13 @@ def get_courses():
 @role_required("instructor")
 def get_my_courses():
     """GET /courses/my — Instructor only. Returns only their own courses."""
-    identity = get_jwt_identity()
-    if is_demo_identity(identity):
+    user_id = int(get_jwt_identity())
+    claims  = get_jwt()
+    if is_demo_identity({"user_id": user_id}):
         my = DEMO_COURSES  # demo instructor owns all courses
         return jsonify({"total": len(my), "courses": my}), 200
     try:
-        instructor = Instructor.query.filter_by(user_id=identity["user_id"]).first()
+        instructor = Instructor.query.filter_by(user_id=user_id).first()
         if not instructor:
             return jsonify({"error": "Instructor profile not found"}), 404
         courses = Course.query.filter_by(instructor_id=instructor.instructor_id).all()
@@ -69,8 +70,8 @@ def get_course(course_id: int):
 @role_required("instructor")
 def create_course():
     """POST /courses — Instructor only."""
-    identity = get_jwt_identity()
-    if is_demo_identity(identity):
+    user_id = int(get_jwt_identity())
+    if is_demo_identity({"user_id": user_id}):
         data = request.get_json() or {}
         return jsonify({
             "message": "Demo mode: course creation simulated successfully!",
@@ -85,7 +86,7 @@ def create_course():
             }
         }), 201
     try:
-        instructor = Instructor.query.filter_by(user_id=identity["user_id"]).first()
+        instructor = Instructor.query.filter_by(user_id=user_id).first()
         if not instructor:
             return jsonify({"error": "Instructor profile not found"}), 404
         data = request.get_json()
@@ -115,14 +116,14 @@ def create_course():
 @role_required("instructor")
 def update_course(course_id: int):
     """PUT /courses/<id> — Instructor only, own courses."""
-    identity = get_jwt_identity()
-    if is_demo_identity(identity):
+    user_id = int(get_jwt_identity())
+    if is_demo_identity({"user_id": user_id}):
         data = request.get_json() or {}
         demo = next((c for c in DEMO_COURSES if c["course_id"] == course_id), DEMO_COURSES[0]).copy()
         demo.update({k: data[k] for k in data if k in demo})
         return jsonify({"message": "Demo mode: course updated!", "course": demo}), 200
     try:
-        instructor = Instructor.query.filter_by(user_id=identity["user_id"]).first()
+        instructor = Instructor.query.filter_by(user_id=user_id).first()
         course = Course.query.get(course_id)
         if not course:
             return jsonify({"error": "Course not found"}), 404
@@ -146,11 +147,11 @@ def update_course(course_id: int):
 @role_required("instructor")
 def delete_course(course_id: int):
     """DELETE /courses/<id> — Instructor only, own courses."""
-    identity = get_jwt_identity()
-    if is_demo_identity(identity):
+    user_id = int(get_jwt_identity())
+    if is_demo_identity({"user_id": user_id}):
         return jsonify({"message": "Demo mode: course deletion simulated!"}), 200
     try:
-        instructor = Instructor.query.filter_by(user_id=identity["user_id"]).first()
+        instructor = Instructor.query.filter_by(user_id=user_id).first()
         course = Course.query.get(course_id)
         if not course:
             return jsonify({"error": "Course not found"}), 404

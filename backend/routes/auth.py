@@ -125,7 +125,12 @@ def login():
         demo = DEMO_USERS[email]
         if password != demo["password"]:
             return jsonify({"error": "Invalid email or password"}), 401
-        access_token = create_access_token(identity=demo["identity"])
+        identity = demo["identity"]
+        additional_claims = {k: v for k, v in identity.items() if k != "user_id"}
+        access_token = create_access_token(
+            identity=str(identity["user_id"]),
+            additional_claims=additional_claims
+        )
         return jsonify({
             "message":      "Login successful (demo account)",
             "access_token": access_token,
@@ -142,21 +147,21 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({"error": "Invalid email or password"}), 401
 
-    # Embed user info in the JWT identity
-    identity = {
-        "user_id": user.user_id,
-        "role":    user.role,
-    }
+    # Build additional claims (role, profile id) — stored alongside sub in the JWT
+    additional_claims = {"role": user.role}
 
-    # Attach profile-specific id
     if user.role == "student" and user.student:
-        identity["student_id"] = user.student.student_id
+        additional_claims["student_id"] = user.student.student_id
     elif user.role == "instructor" and user.instructor:
-        identity["instructor_id"] = user.instructor.instructor_id
+        additional_claims["instructor_id"] = user.instructor.instructor_id
     elif user.role == "admin":
-        identity["is_admin"] = True
+        additional_claims["is_admin"] = True
 
-    access_token = create_access_token(identity=identity)
+    # identity must be a simple scalar for flask-jwt-extended v4.x
+    access_token = create_access_token(
+        identity=str(user.user_id),
+        additional_claims=additional_claims
+    )
 
     return jsonify({
         "message":      "Login successful",

@@ -1,10 +1,14 @@
 """
 Shared authentication/authorization decorators.
 Import these in any blueprint to protect routes by role.
+
+NOTE: Flask-JWT-Extended v4.x stores identity as 'sub' (must be a scalar string).
+      Role and profile IDs are stored as 'additional_claims' in the JWT.
+      Use get_jwt() to read claims; use get_jwt_identity() to get the user_id string.
 """
 from functools import wraps
 from flask import jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
 
 def role_required(*roles):
@@ -18,15 +22,15 @@ def role_required(*roles):
 
     The decorator:
       1. Enforces a valid JWT (equivalent to @jwt_required()).
-      2. Reads the 'role' field from the JWT identity payload.
+      2. Reads the 'role' field from the JWT additional claims.
       3. Returns 403 if the caller's role is not in the allowed list.
     """
     def decorator(fn):
         @wraps(fn)
         @jwt_required()
         def wrapper(*args, **kwargs):
-            identity = get_jwt_identity()
-            caller_role = identity.get("role", "")
+            claims = get_jwt()           # reads additional_claims + standard fields
+            caller_role = claims.get("role", "")
             if caller_role not in roles:
                 allowed = " / ".join(roles)
                 return jsonify({
@@ -46,8 +50,8 @@ def admin_required(fn):
     @wraps(fn)
     @jwt_required()
     def wrapper(*args, **kwargs):
-        identity = get_jwt_identity()
-        if identity.get("role") != "admin":
+        claims = get_jwt()
+        if claims.get("role") != "admin":
             return jsonify({"error": "Access denied: Admins only"}), 403
         return fn(*args, **kwargs)
     return wrapper

@@ -18,9 +18,9 @@ from demo_data import (
 admin_bp = Blueprint("admin", __name__)
 
 
-def _is_demo(fn):
+def _is_demo():
     """Helper: returns True if the current JWT is a demo account."""
-    return is_demo_identity(get_jwt_identity())
+    return is_demo_identity({"user_id": int(get_jwt_identity())})
 
 
 # ─────────────────────────────────────────────
@@ -97,11 +97,11 @@ def delete_user(user_id):
     if _is_demo():
         return jsonify({"message": "Demo mode: user deletion simulated!"}), 200
     try:
-        identity = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
         if not user:
             return jsonify({"error": "User not found"}), 404
-        if user.user_id == identity["user_id"]:
+        if user.user_id == current_user_id:
             return jsonify({"error": "You cannot delete your own account"}), 400
         db.session.delete(user)
         db.session.commit()
