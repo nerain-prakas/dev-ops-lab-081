@@ -7,8 +7,36 @@ from datetime import date
 from flask_jwt_extended import get_jwt_identity, get_jwt
 from utils.decorators import role_required
 from demo_data import DEMO_RESERVATIONS_STUDENT, is_demo
+from uuid import UUID
 
 reservations_bp = Blueprint("reservations", __name__)
+
+
+def _is_valid_uuid(value) -> bool:
+    try:
+        UUID(str(value))
+        return True
+    except Exception:
+        return False
+
+
+def _resolve_current_student():
+    """Resolve student from JWT identity/claims safely for UUID-based schemas."""
+    user_id = get_jwt_identity()
+    claims = get_jwt()
+
+    if _is_valid_uuid(user_id):
+        student = Student.query.filter_by(user_id=str(user_id)).first()
+        if student:
+            return student
+
+    claim_student_id = claims.get("student_id")
+    if _is_valid_uuid(claim_student_id):
+        student = Student.query.get(str(claim_student_id))
+        if student:
+            return student
+
+    return None
 
 
 @reservations_bp.route("/reserve", methods=["POST"])
@@ -26,15 +54,14 @@ def reserve_course():
             }
         }), 201
     try:
-        user_id = get_jwt_identity()
-        claims  = get_jwt()
-        student = Student.query.filter_by(user_id=user_id).first()
+        student = _resolve_current_student()
         if not student:
-            return jsonify({"error": "Student profile not found"}), 404
+            return jsonify({"error": "Invalid student session. Please login again."}), 401
         data = request.get_json()
-        if not data or not data.get("course_id"):
+        course_id = (data or {}).get("course_id")
+        if course_id is None or str(course_id).strip() == "":
             return jsonify({"error": "course_id is required"}), 400
-        course = Course.query.get(data["course_id"])
+        course = Course.query.get(str(course_id))
         if not course:
             return jsonify({"error": "Course not found"}), 404
         existing = Reservation.query.filter_by(
@@ -62,10 +89,9 @@ def get_reservations():
     if is_demo():
         return jsonify({"total": len(DEMO_RESERVATIONS_STUDENT), "reservations": DEMO_RESERVATIONS_STUDENT}), 200
     try:
-        user_id = get_jwt_identity()
-        student = Student.query.filter_by(user_id=user_id).first()
+        student = _resolve_current_student()
         if not student:
-            return jsonify({"error": "Student profile not found"}), 404
+            return jsonify({"error": "Invalid student session. Please login again."}), 401
         reservations = Reservation.query.filter_by(student_id=student.student_id).all()
         return jsonify({"total": len(reservations), "reservations": [r.to_dict() for r in reservations]}), 200
     except Exception:

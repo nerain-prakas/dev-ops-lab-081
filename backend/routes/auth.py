@@ -160,8 +160,7 @@ def login():
         if password != demo["password"]:
             return jsonify({"error": "Invalid email or password"}), 401
 
-        # Prefer DB-backed demo accounts so create/update/delete operations persist.
-        # Fallback to stateless demo token only when DB is unavailable.
+        # Demo accounts are DB-backed so protected writes persist with valid UUID identities.
         try:
             demo_user = _ensure_demo_user_in_db(
                 email=email,
@@ -180,17 +179,9 @@ def login():
                 "user":         demo_user.to_dict(),
             }), 200
         except Exception:
-            identity = demo["identity"]
-            additional_claims = {k: v for k, v in identity.items() if k != "user_id"}
-            access_token = create_access_token(
-                identity=str(identity["user_id"]),
-                additional_claims=additional_claims
-            )
             return jsonify({
-                "message":      "Login successful (demo account)",
-                "access_token": access_token,
-                "user":         demo["user"],
-            }), 200
+                "error": "Database unavailable for demo login. Please try again shortly."
+            }), 503
     # ── End demo accounts ─────────────────────────────────────────────────
 
     # Normal DB-backed login

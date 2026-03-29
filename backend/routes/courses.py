@@ -2,11 +2,39 @@ from flask import Blueprint, request, jsonify
 from database.db import db
 from models.course import Course
 from models.instructor import Instructor
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, get_jwt
 from utils.decorators import role_required
 from demo_data import DEMO_COURSES, is_demo
+from uuid import UUID
 
 courses_bp = Blueprint("courses", __name__)
+
+
+def _is_valid_uuid(value) -> bool:
+    try:
+        UUID(str(value))
+        return True
+    except Exception:
+        return False
+
+
+def _resolve_current_instructor():
+    """Resolve instructor safely from JWT identity/claims for UUID-based schemas."""
+    user_id = get_jwt_identity()
+    claims = get_jwt()
+
+    if _is_valid_uuid(user_id):
+        instructor = Instructor.query.filter_by(user_id=str(user_id)).first()
+        if instructor:
+            return instructor
+
+    claim_instructor_id = claims.get("instructor_id")
+    if _is_valid_uuid(claim_instructor_id):
+        instructor = Instructor.query.get(str(claim_instructor_id))
+        if instructor:
+            return instructor
+
+    return None
 
 
 @courses_bp.route("/courses", methods=["GET"])
@@ -36,10 +64,9 @@ def get_my_courses():
     if is_demo():
         return jsonify({"total": len(DEMO_COURSES), "courses": DEMO_COURSES}), 200
     try:
-        user_id    = get_jwt_identity()          # string
-        instructor = Instructor.query.filter_by(user_id=user_id).first()
+        instructor = _resolve_current_instructor()
         if not instructor:
-            return jsonify({"error": "Instructor profile not found"}), 404
+            return jsonify({"error": "Invalid instructor session. Please login again."}), 401
         courses = Course.query.filter_by(instructor_id=instructor.instructor_id).all()
         return jsonify({"total": len(courses), "courses": [c.to_dict() for c in courses]}), 200
     except Exception:
@@ -80,10 +107,9 @@ def create_course():
             }
         }), 201
     try:
-        user_id    = get_jwt_identity()
-        instructor = Instructor.query.filter_by(user_id=user_id).first()
+        instructor = _resolve_current_instructor()
         if not instructor:
-            return jsonify({"error": "Instructor profile not found"}), 404
+            return jsonify({"error": "Invalid instructor session. Please login again."}), 401
         data = request.get_json()
         if not data:
             return jsonify({"error": "No input data provided"}), 400
@@ -117,8 +143,7 @@ def update_course(course_id: str):
         demo.update({k: data[k] for k in data if k in demo})
         return jsonify({"message": "Demo mode: course updated!", "course": demo}), 200
     try:
-        user_id    = get_jwt_identity()
-        instructor = Instructor.query.filter_by(user_id=user_id).first()
+        instructor = _resolve_current_instructor()
         course     = Course.query.get(course_id)
         if not course:
             return jsonify({"error": "Course not found"}), 404
@@ -145,8 +170,7 @@ def delete_course(course_id: str):
     if is_demo():
         return jsonify({"message": "Demo mode: course deletion simulated!"}), 200
     try:
-        user_id    = get_jwt_identity()
-        instructor = Instructor.query.filter_by(user_id=user_id).first()
+        instructor = _resolve_current_instructor()
         course     = Course.query.get(course_id)
         if not course:
             return jsonify({"error": "Course not found"}), 404

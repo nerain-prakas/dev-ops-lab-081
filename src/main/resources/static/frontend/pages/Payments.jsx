@@ -16,6 +16,13 @@ export default function Payments() {
     const [form, setForm]                 = useState({ reservation_id: '', amount: '', payment_type: 'credit_card' });
     const [error, setError]               = useState('');
 
+    const getCoursePriceForReservation = (reservationId, reservationList, courseList) => {
+        const reservation = reservationList.find(r => String(r.reservation_id) === String(reservationId));
+        if (!reservation) return '';
+        const course = courseList.find(c => String(c.course_id) === String(reservation.course_id));
+        return course ? String(course.price) : '';
+    };
+
     async function load() {
         try {
             setError('');
@@ -35,10 +42,10 @@ export default function Payments() {
                 const qId       = new URLSearchParams(location.search).get('reservationId');
                 const selected  = pending.find(r => String(r.reservation_id) === qId) || pending[0];
                 if (selected) {
-                    const course = coursesData.courses.find(c => c.course_id === selected.course_id);
+                    const amount = getCoursePriceForReservation(selected.reservation_id, pending, coursesData.courses || []);
                     setForm({
                         reservation_id: String(selected.reservation_id),
-                        amount:         course ? String(course.price) : '',
+                        amount,
                         payment_type:   'credit_card',
                     });
                     if (qId) setShowModal(true);
@@ -60,9 +67,8 @@ export default function Payments() {
     const totalRevenue = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
 
     const handleReservationChange = (rid) => {
-        const res    = reservations.find(r => String(r.reservation_id) === rid);
-        const course = courses.find(c => c.course_id === res?.course_id);
-        setForm({ reservation_id: rid, amount: course ? String(course.price) : '', payment_type: form.payment_type });
+        const amount = getCoursePriceForReservation(rid, reservations, courses);
+        setForm({ reservation_id: rid, amount, payment_type: form.payment_type });
     };
 
     const handleProcess = async (e) => {
@@ -72,8 +78,8 @@ export default function Payments() {
                 method: 'POST',
                 token,
                 data: {
-                    reservation_id: Number(form.reservation_id),
-                    amount:         Number(form.amount),
+                    reservation_id: form.reservation_id,
+                    amount:         Number(form.amount || 0),
                     payment_type:   form.payment_type,
                 },
             });
@@ -206,7 +212,7 @@ export default function Payments() {
                                             className="form-input"
                                             type="number"
                                             value={form.amount}
-                                            onChange={e => setForm({ ...form, amount: e.target.value })}
+                                            readOnly
                                             required
                                         />
                                     </div>

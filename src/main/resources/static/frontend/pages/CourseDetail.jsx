@@ -23,7 +23,7 @@ export default function CourseDetail() {
                 const endpoint = role === 'admin' ? '/admin/enrollments' : '/enrollments';
                 const enrollData = await apiRequest(endpoint, { token });
                 setEnrollments(
-                    (enrollData.enrollments || []).filter(e => Number(e.course_id) === Number(id))
+                    (enrollData.enrollments || []).filter(e => String(e.course_id) === String(id))
                 );
             } catch (err) {
                 setError(err.message);
@@ -38,7 +38,7 @@ export default function CourseDetail() {
             await apiRequest('/reserve', {
                 method: 'POST',
                 token,
-                data: { course_id: Number(id) },
+                data: { course_id: id },
             });
             navigate('/reservations');
         } catch (err) {

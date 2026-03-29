@@ -1,0 +1,65 @@
+Traceback (most recent call last):
+  File "d:\codes\OOSE\dev-ops-lab-081\backend\scripts\render_supabase_write_test.py", line 376, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "d:\codes\OOSE\dev-ops-lab-081\backend\scripts\render_supabase_write_test.py", line 368, in main
+    run_real_write_mode(base_url)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "d:\codes\OOSE\dev-ops-lab-081\backend\scripts\render_supabase_write_test.py", line 240, in run_real_write_mode
+    register_user(
+    ~~~~~~~~~~~~~^
+        base_url,
+        ^^^^^^^^^
+    ...<6 lines>...
+        },
+        ^^
+    )
+    ^
+  File "d:\codes\OOSE\dev-ops-lab-081\backend\scripts\render_supabase_write_test.py", line 136, in register_user
+    r = api_call(base_url, "POST", "/api/register", body=payload)
+  File "d:\codes\OOSE\dev-ops-lab-081\backend\scripts\render_supabase_write_test.py", line 84, in api_call
+    with request.urlopen(req, timeout=timeout) as resp:
+         ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 189, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 489, in open
+    response = self._open(req, data)
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 506, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+                              '_open', req)
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 466, in _call_chain
+    result = func(*args)
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 1367, in https_open
+    return self.do_open(http.client.HTTPSConnection, req,
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        context=self._context)
+                        ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 1323, in do_open
+    r = h.getresponse()
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1430, in getresponse
+    response.begin()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 292, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\socket.py", line 719, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\ssl.py", line 1304, in recv_into
+    return self.read(nbytes, buffer)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\nalin\AppData\Local\Programs\Python\Python313\Lib\ssl.py", line 1138, in read
+    return self._sslobj.read(len, buffer)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+TimeoutError: The read operation timed out
+Render/Supabase verification starting...
+Base URL: https://dev-ops-lab-081.onrender.com
+Mode: write
+
+=== WRITE MODE: end-to-end DB write verification against Supabase ===
+
+[UNEXPECTED-ERROR] The read operation timed out
