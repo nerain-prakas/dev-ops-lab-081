@@ -18,6 +18,9 @@ class Config:
     SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-secret-key")
+    # Keep compatibility with dict identities used in create_access_token().
+    # Newer JWT stacks can enforce string 'sub' and return 422 otherwise.
+    JWT_VERIFY_SUB = False
     # Tokens expire after 24 hours for security
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
     DEBUG = os.getenv("FLASK_DEBUG", "True") == "True"

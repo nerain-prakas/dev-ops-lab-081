@@ -1,5 +1,27 @@
 const STORAGE_KEY = "coursehub_session";
 
+function decodeJwtPayload(token) {
+    try {
+        const parts = String(token || "").split('.');
+        if (parts.length !== 3) return null;
+
+        const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+        return JSON.parse(atob(padded));
+    } catch {
+        return null;
+    }
+}
+
+function isExpiredToken(token) {
+    const payload = decodeJwtPayload(token);
+    if (!payload || typeof payload.exp !== 'number') {
+        return true;
+    }
+    const now = Math.floor(Date.now() / 1000);
+    return payload.exp <= now;
+}
+
 export function setSession({ accessToken, user }) {
     const session = {
         accessToken,
@@ -13,7 +35,15 @@ export function getSession() {
     const value = localStorage.getItem(STORAGE_KEY);
     if (!value) return null;
     try {
-        return JSON.parse(value);
+        const session = JSON.parse(value);
+        const token = session?.accessToken;
+
+        if (!token || isExpiredToken(token)) {
+            clearSession();
+            return null;
+        }
+
+        return session;
     } catch {
         clearSession();
         return null;

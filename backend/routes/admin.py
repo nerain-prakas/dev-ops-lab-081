@@ -74,7 +74,7 @@ def get_all_users():
         return jsonify({"total": len(DEMO_USERS_ADMIN), "users": DEMO_USERS_ADMIN}), 200
 
 
-@admin_bp.route("/admin/users/<int:user_id>", methods=["GET"])
+@admin_bp.route("/admin/users/<string:user_id>", methods=["GET"])
 @admin_required
 def get_user(user_id):
     if _is_demo():
@@ -91,7 +91,7 @@ def get_user(user_id):
         return jsonify({"error": "DB unavailable"}), 503
 
 
-@admin_bp.route("/admin/users/<int:user_id>", methods=["DELETE"])
+@admin_bp.route("/admin/users/<string:user_id>", methods=["DELETE"])
 @admin_required
 def delete_user(user_id):
     if _is_demo():
@@ -110,7 +110,7 @@ def delete_user(user_id):
         return jsonify({"error": str(e)}), 500
 
 
-@admin_bp.route("/admin/users/<int:user_id>/role", methods=["PATCH"])
+@admin_bp.route("/admin/users/<string:user_id>/role", methods=["PATCH"])
 @admin_required
 def change_user_role(user_id):
     if _is_demo():
@@ -146,7 +146,7 @@ def get_all_courses():
         return jsonify({"total": len(DEMO_COURSES), "courses": DEMO_COURSES}), 200
 
 
-@admin_bp.route("/admin/courses/<int:course_id>", methods=["DELETE"])
+@admin_bp.route("/admin/courses/<string:course_id>", methods=["DELETE"])
 @admin_required
 def delete_course(course_id):
     if _is_demo():
@@ -183,7 +183,7 @@ def get_all_reservations():
         return jsonify({"total": len(DEMO_RESERVATIONS_ADMIN), "reservations": DEMO_RESERVATIONS_ADMIN}), 200
 
 
-@admin_bp.route("/admin/reservations/<int:reservation_id>", methods=["PATCH"])
+@admin_bp.route("/admin/reservations/<string:reservation_id>", methods=["PATCH"])
 @admin_required
 def update_reservation_status(reservation_id):
     if _is_demo():

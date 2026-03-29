@@ -46,8 +46,8 @@ def get_my_courses():
         return jsonify({"total": len(DEMO_COURSES), "courses": DEMO_COURSES}), 200
 
 
-@courses_bp.route("/courses/<int:course_id>", methods=["GET"])
-def get_course(course_id: int):
+@courses_bp.route("/courses/<string:course_id>", methods=["GET"])
+def get_course(course_id: str):
     """GET /courses/<id> — Public."""
     try:
         course = Course.query.get(course_id)
@@ -107,9 +107,9 @@ def create_course():
         return jsonify({"error": str(e)}), 500
 
 
-@courses_bp.route("/courses/<int:course_id>", methods=["PUT"])
+@courses_bp.route("/courses/<string:course_id>", methods=["PUT"])
 @role_required("instructor")
-def update_course(course_id: int):
+def update_course(course_id: str):
     """PUT /courses/<id> — Instructor only, own courses."""
     if is_demo():
         data = request.get_json() or {}
@@ -138,9 +138,9 @@ def update_course(course_id: int):
         return jsonify({"error": str(e)}), 500
 
 
-@courses_bp.route("/courses/<int:course_id>", methods=["DELETE"])
+@courses_bp.route("/courses/<string:course_id>", methods=["DELETE"])
 @role_required("instructor")
-def delete_course(course_id: int):
+def delete_course(course_id: str):
     """DELETE /courses/<id> — Instructor only, own courses."""
     if is_demo():
         return jsonify({"message": "Demo mode: course deletion simulated!"}), 200

@@ -8,6 +8,40 @@ from flask_jwt_extended import create_access_token
 auth_bp = Blueprint("auth", __name__)
 
 
+def _build_claims_from_user(user: User) -> dict:
+    """Build JWT additional claims for a persisted user."""
+    claims = {"role": user.role}
+    if user.role == "student" and user.student:
+        claims["student_id"] = user.student.student_id
+    elif user.role == "instructor" and user.instructor:
+        claims["instructor_id"] = user.instructor.instructor_id
+    elif user.role == "admin":
+        claims["is_admin"] = True
+    return claims
+
+
+def _ensure_demo_user_in_db(email: str, name: str, role: str, demo_password: str) -> User:
+    """Ensure demo account exists in DB so protected writes can persist normally."""
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        user = User(name=name, email=email, role=role)
+        user.set_password(demo_password)
+        db.session.add(user)
+        db.session.flush()
+
+    # Keep demo account role consistent and ensure role-specific profile exists.
+    if user.role != role:
+        user.role = role
+
+    if role == "student" and not user.student:
+        db.session.add(Student(user_id=user.user_id, phone=None))
+    elif role == "instructor" and not user.instructor:
+        db.session.add(Instructor(user_id=user.user_id, specialization="Demo Instructor"))
+
+    db.session.commit()
+    return user
+
+
 @auth_bp.route("/register", methods=["POST"])
 def register():
     """
@@ -125,17 +159,38 @@ def login():
         demo = DEMO_USERS[email]
         if password != demo["password"]:
             return jsonify({"error": "Invalid email or password"}), 401
-        identity = demo["identity"]
-        additional_claims = {k: v for k, v in identity.items() if k != "user_id"}
-        access_token = create_access_token(
-            identity=str(identity["user_id"]),
-            additional_claims=additional_claims
-        )
-        return jsonify({
-            "message":      "Login successful (demo account)",
-            "access_token": access_token,
-            "user":         demo["user"],
-        }), 200
+
+        # Prefer DB-backed demo accounts so create/update/delete operations persist.
+        # Fallback to stateless demo token only when DB is unavailable.
+        try:
+            demo_user = _ensure_demo_user_in_db(
+                email=email,
+                name=demo["user"]["name"],
+                role=demo["user"]["role"],
+                demo_password=demo["password"],
+            )
+            additional_claims = _build_claims_from_user(demo_user)
+            access_token = create_access_token(
+                identity=str(demo_user.user_id),
+                additional_claims=additional_claims,
+            )
+            return jsonify({
+                "message":      "Login successful (demo account, DB-backed)",
+                "access_token": access_token,
+                "user":         demo_user.to_dict(),
+            }), 200
+        except Exception:
+            identity = demo["identity"]
+            additional_claims = {k: v for k, v in identity.items() if k != "user_id"}
+            access_token = create_access_token(
+                identity=str(identity["user_id"]),
+                additional_claims=additional_claims
+            )
+            return jsonify({
+                "message":      "Login successful (demo account)",
+                "access_token": access_token,
+                "user":         demo["user"],
+            }), 200
     # ── End demo accounts ─────────────────────────────────────────────────
 
     # Normal DB-backed login
@@ -148,14 +203,7 @@ def login():
         return jsonify({"error": "Invalid email or password"}), 401
 
     # Build additional claims (role, profile id) — stored alongside sub in the JWT
-    additional_claims = {"role": user.role}
-
-    if user.role == "student" and user.student:
-        additional_claims["student_id"] = user.student.student_id
-    elif user.role == "instructor" and user.instructor:
-        additional_claims["instructor_id"] = user.instructor.instructor_id
-    elif user.role == "admin":
-        additional_claims["is_admin"] = True
+    additional_claims = _build_claims_from_user(user)
 
     # identity must be a simple scalar for flask-jwt-extended v4.x
     access_token = create_access_token(

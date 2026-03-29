@@ -2,14 +2,28 @@
 Helper to check if the current request is from a demo account.
 Works with flask-jwt-extended v4 where identity is a string (user_id).
 """
+import os
 from flask_jwt_extended import get_jwt_identity
 
 # Demo user IDs (as strings, matching how auth.py stores them)
 DEMO_USER_IDS = {"9001", "9002", "9003"}
 
 
+def _demo_mode_enabled() -> bool:
+    """
+    Demo simulation is opt-in via DEMO_MODE_ENABLED=true.
+    This avoids accidental fake writes in deployed environments.
+    """
+    raw = os.getenv("DEMO_MODE_ENABLED")
+    if raw is None:
+        return False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def is_demo() -> bool:
     """Returns True if the current JWT belongs to a hardcoded demo account."""
+    if not _demo_mode_enabled():
+        return False
     try:
         return str(get_jwt_identity()) in DEMO_USER_IDS
     except Exception:

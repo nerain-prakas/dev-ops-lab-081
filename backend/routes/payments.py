@@ -3,6 +3,7 @@ from database.db import db
 from models.payment import Payment
 from models.reservation import Reservation
 from models.enrollment import Enrollment
+from models.student import Student
 from datetime import date
 from flask_jwt_extended import get_jwt_identity, get_jwt
 from utils.decorators import role_required
@@ -36,6 +37,14 @@ def make_payment():
         claims  = get_jwt()
         student_id = claims.get("student_id")
 
+        # If claim is missing or uses a different runtime type (uuid/int),
+        # resolve from the student profile by authenticated user_id.
+        if student_id is None:
+            student = Student.query.filter_by(user_id=user_id).first()
+            if not student:
+                return jsonify({"error": "Student profile not found"}), 404
+            student_id = student.student_id
+
         data = request.get_json()
         if not data:
             return jsonify({"error": "No input data provided"}), 400
@@ -47,7 +56,9 @@ def make_payment():
         reservation = Reservation.query.get(data["reservation_id"])
         if not reservation:
             return jsonify({"error": "Reservation not found"}), 404
-        if reservation.student_id != student_id:
+
+        # Normalize IDs to string to avoid false mismatch between uuid/int types.
+        if str(reservation.student_id) != str(student_id):
             return jsonify({"error": "Access denied"}), 403
         if reservation.status != "pending":
             return jsonify({"error": f"Cannot pay for a {reservation.status} reservation"}), 400
@@ -87,6 +98,11 @@ def get_payments():
         user_id    = get_jwt_identity()
         claims     = get_jwt()
         student_id = claims.get("student_id")
+        if student_id is None:
+            student = Student.query.filter_by(user_id=user_id).first()
+            if not student:
+                return jsonify({"total": 0, "payments": []}), 200
+            student_id = student.student_id
         reservations    = Reservation.query.filter_by(student_id=student_id).all()
         reservation_ids = [r.reservation_id for r in reservations]
         payments = Payment.query.filter(Payment.reservation_id.in_(reservation_ids)).all()

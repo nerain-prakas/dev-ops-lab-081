@@ -62,11 +62,18 @@ export default function Courses() {
                 price:       Number(form.price),
                 total_seats: Number(form.total_seats),
             };
+            let result;
             if (editingCourse) {
-                await apiRequest(`/courses/${editingCourse.course_id}`, { method: 'PUT', token, data: payload });
+                result = await apiRequest(`/courses/${editingCourse.course_id}`, { method: 'PUT', token, data: payload });
             } else {
-                await apiRequest('/courses', { method: 'POST', token, data: payload });
+                result = await apiRequest('/courses', { method: 'POST', token, data: payload });
             }
+
+            const msg = String(result?.message || '');
+            if (msg.toLowerCase().includes('demo mode')) {
+                setError('You are using a demo account. Actions are simulated and are not saved to the database. Login with a real instructor account to persist data.');
+            }
+
             setShowModal(false);
             setForm({ title: '', description: '', price: '', total_seats: '' });
             setEditingCourse(null);
